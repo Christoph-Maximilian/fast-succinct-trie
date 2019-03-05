@@ -14,14 +14,16 @@
 using namespace std;
 
 const string testFilePath = "../../test/bulkload_sort";
+const string testFileExamplePath = "../../test/bulkload_example";
 
 class UnitTest : public ::testing::Test {
 public:
-    virtual void SetUp () { }
-    virtual void TearDown () { }
+    virtual void SetUp() {}
+
+    virtual void TearDown() {}
 };
 
-inline void printStatFST(FST* index) {
+inline void printStatFST(FST *index) {
     cout << "mem = " << index->mem() << "\n";
 
     cout << "cMemU = " << index->cMemU() << "\n";
@@ -37,54 +39,54 @@ inline void printStatFST(FST* index) {
     cout << "valueMem = " << index->valueMem() << "\n";
 }
 
-inline int loadFile (string filePath, vector<string> &keys, vector<uint64_t> &values) {
+inline int loadFile(string filePath, vector<string> &keys, vector<uint64_t> &values) {
     ifstream infile(filePath);
     string op;
     string key;
     uint64_t count = 0;
     int longestKeyLen = 0;
     while (count < TEST_SIZE && infile.good()) {
-	infile >> key; //subject to change
-	keys.push_back(key);
-	values.push_back(count);
-	if (key.length() > longestKeyLen)
-	    longestKeyLen = key.length();
-	count++;
+        auto tmp = key;
+        infile >> key; //subject to change
+        if (key == tmp) { break; }
+        keys.push_back(key);
+        values.push_back(count);
+        if (key.length() > longestKeyLen) { longestKeyLen = key.length(); }
+        count++;
     }
-
     return longestKeyLen;
 }
 
-inline int loadFile_ptrValue (string filePath, vector<string> &keys, vector<uint64_t> &values) {
+inline int loadFile_ptrValue(string filePath, vector<string> &keys, vector<uint64_t> &values) {
     ifstream infile(filePath);
     string op;
     string key;
     uint64_t count = 0;
     int longestKeyLen = 0;
     while (count < TEST_SIZE && infile.good()) {
-	infile >> key; //subject to change
-	keys.push_back(key);
-	//values.push_back(count);
-	values.push_back((uint64_t)(const_cast<char*>(keys[count].c_str())));
-	if (key.length() > longestKeyLen)
-	    longestKeyLen = key.length();
-	count++;
+        infile >> key; //subject to change
+        keys.push_back(key);
+        //values.push_back(count);
+        values.push_back((uint64_t) (const_cast<char *>(keys[count].c_str())));
+        if (key.length() > longestKeyLen)
+            longestKeyLen = key.length();
+        count++;
     }
 
     return longestKeyLen;
 }
 
-inline int loadMonoInt (vector<uint64_t> &keys) {
+inline int loadMonoInt(vector<uint64_t> &keys) {
     for (uint64_t i = 0; i < TEST_SIZE; i++)
-	keys.push_back(i);
+        keys.push_back(i);
     return sizeof(uint64_t);
 }
 
-inline int loadRandInt (vector<uint64_t> &keys) {
+inline int loadRandInt(vector<uint64_t> &keys) {
     srand(0);
     for (uint64_t i = 0; i < TEST_SIZE; i++) {
-	uint64_t r = rand();
-	keys.push_back(r);
+        uint64_t r = rand();
+        keys.push_back(r);
     }
     sort(keys.begin(), keys.end());
     return sizeof(uint64_t);
@@ -107,10 +109,10 @@ TEST_F(UnitTest, LookupTest) {
 
     uint64_t fetchedValue;
     for (int i = 0; i < TEST_SIZE; i++) {
-	if (i > 0 && keys[i].compare(keys[i-1]) == 0)
-	    continue;
-	ASSERT_TRUE(index->lookup((uint8_t*)keys[i].c_str(), keys[i].length(), fetchedValue));
-	ASSERT_EQ(values[i], fetchedValue);
+        if (i > 0 && keys[i].compare(keys[i - 1]) == 0)
+            continue;
+        ASSERT_TRUE(index->lookup((uint8_t *) keys[i].c_str(), keys[i].length(), fetchedValue));
+        ASSERT_EQ(values[i], fetchedValue);
     }
 }
 
@@ -126,8 +128,8 @@ TEST_F(UnitTest, LookupMonoIntTest) {
 
     uint64_t fetchedValue;
     for (uint64_t i = 0; i < TEST_SIZE; i++) {
-	ASSERT_TRUE(index->lookup(keys[i], fetchedValue));
-	ASSERT_EQ(keys[i], fetchedValue);
+        ASSERT_TRUE(index->lookup(keys[i], fetchedValue));
+        ASSERT_EQ(keys[i], fetchedValue);
     }
 }
 
@@ -146,11 +148,10 @@ TEST_F(UnitTest, LookupRandIntTest) {
     uint64_t fetchedValue;
 
     for (uint64_t i = 0; i < TEST_SIZE; i++) {
-	ASSERT_TRUE(index->lookup(keys[i], fetchedValue));
-	ASSERT_EQ(keys[i], fetchedValue);
+        ASSERT_TRUE(index->lookup(keys[i], fetchedValue));
+        ASSERT_EQ(keys[i], fetchedValue);
     }
 }
-
 
 
 TEST_F(UnitTest, ScanTest) {
@@ -165,21 +166,20 @@ TEST_F(UnitTest, ScanTest) {
 
     FSTIter iter(index);
     for (int i = 0; i < TEST_SIZE - 1; i++) {
-	if (i > 0 && keys[i].compare(keys[i-1]) == 0)
-	    continue;
-	ASSERT_TRUE(index->lowerBound((uint8_t*)keys[i].c_str(), keys[i].length(), iter));
-	ASSERT_EQ(values[i], iter.value());
+        if (i > 0 && keys[i].compare(keys[i - 1]) == 0)
+            continue;
+        ASSERT_TRUE(index->lowerBound((uint8_t *) keys[i].c_str(), keys[i].length(), iter));
+        ASSERT_EQ(values[i], iter.value());
 
-	for (int j = 0; j < RANGE_SIZE; j++) {
-	    if (i+j+1 < TEST_SIZE) {
-		ASSERT_TRUE(iter++);
-		ASSERT_EQ(values[i+j+1], iter.value());
-	    }
-	    else {
-		ASSERT_FALSE(iter++);
-		ASSERT_EQ(values[TEST_SIZE-1], iter.value());
-	    }
-	}
+        for (int j = 0; j < RANGE_SIZE; j++) {
+            if (i + j + 1 < TEST_SIZE) {
+                ASSERT_TRUE(iter++);
+                ASSERT_EQ(values[i + j + 1], iter.value());
+            } else {
+                ASSERT_FALSE(iter++);
+                ASSERT_EQ(values[TEST_SIZE - 1], iter.value());
+            }
+        }
     }
 }
 
@@ -195,26 +195,54 @@ TEST_F(UnitTest, ScanMonoIntTest) {
 
     FSTIter iter(index);
     for (int i = 0; i < TEST_SIZE - 1; i++) {
-	uint64_t fetchedValue;
-	index->lookup(keys[i], fetchedValue);
-	ASSERT_TRUE(index->lowerBound(keys[i], iter));
-	ASSERT_EQ(keys[i], iter.value());
+        uint64_t fetchedValue;
+        index->lookup(keys[i], fetchedValue);
+        ASSERT_TRUE(index->lowerBound(keys[i], iter));
+        ASSERT_EQ(keys[i], iter.value());
 
-	for (int j = 0; j < RANGE_SIZE; j++) {
-	    if (i+j+1 < TEST_SIZE) {
-		ASSERT_TRUE(iter++);
-		ASSERT_EQ(keys[i+j+1], iter.value());
-	    }
-	    else {
-		ASSERT_FALSE(iter++);
-		ASSERT_EQ(keys[TEST_SIZE-1], iter.value());
-	    }
-	}
-
+        for (int j = 0; j < RANGE_SIZE; j++) {
+            if (i + j + 1 < TEST_SIZE) {
+                ASSERT_TRUE(iter++);
+                ASSERT_EQ(keys[i + j + 1], iter.value());
+            } else {
+                ASSERT_FALSE(iter++);
+                ASSERT_EQ(keys[TEST_SIZE - 1], iter.value());
+            }
+        }
     }
 }
 
-int main (int argc, char** argv) {
+TEST_F(UnitTest, LookupTestExample) {
+    /*
+     * bri = 0
+     * eng = 1
+     * fra = 2
+     * ger = 3
+     * gre = 4
+     * ita = 5
+     */
+    vector<string> keys;
+    vector<uint64_t> values;
+    int longestKeyLen = loadFile(testFileExamplePath, keys, values);
+
+    FST *index = new FST();
+    index->load(keys, values, longestKeyLen);
+
+    printStatFST(index);
+
+    //print values saved in fst
+
+    uint64_t fetchedValue;
+    ASSERT_TRUE(index->lookup((uint8_t *) "greek", 5, fetchedValue));
+    ASSERT_EQ(4, fetchedValue);
+
+    ASSERT_TRUE(index->lookup((uint8_t *) "england", 7, fetchedValue));
+    ASSERT_EQ(1, fetchedValue);
+
+
+}
+
+int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

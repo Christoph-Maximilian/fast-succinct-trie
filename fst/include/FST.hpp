@@ -33,6 +33,8 @@ public:
     bool lowerBound(const uint8_t* key, const int keylen, FSTIter &iter);
     bool lowerBound(const uint64_t key, FSTIter &iter);
 
+    uint64_t * get_values();
+
     uint32_t cMemU();
     uint32_t tMemU();
     uint32_t oMemU();
