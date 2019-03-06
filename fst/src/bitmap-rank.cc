@@ -28,16 +28,16 @@ Modified by Huanchen Zhang
 
 #include <iostream>
 
-BitmapRankPoppy::BitmapRankPoppy(uint64 *bits, uint32 nbits)
+BitmapRankPoppy::BitmapRankPoppy(uint64_t *bits, uint32_t nbits)
 {
     bits_ = bits;
     nbits_ = nbits;    
     basicBlockCount_ = nbits_ / kBasicBlockSize;
 
-    assert(posix_memalign((void **) &rankLUT_, kCacheLineSize, basicBlockCount_ * sizeof(uint32)) >= 0);
+    assert(posix_memalign((void **) &rankLUT_, kCacheLineSize, basicBlockCount_ * sizeof(uint32_t)) >= 0);
 
-    uint32 rankCum = 0;
-    for (uint32 i = 0; i < basicBlockCount_; i++) {
+    uint32_t rankCum = 0;
+    for (uint32_t i = 0; i < basicBlockCount_; i++) {
 	rankLUT_[i] = rankCum;
 	rankCum += popcountLinear(bits_, 
 				  i * kWordCountPerBasicBlock, 
@@ -46,24 +46,24 @@ BitmapRankPoppy::BitmapRankPoppy(uint64 *bits, uint32 nbits)
     rankLUT_[basicBlockCount_-1] = rankCum;
 
     pCount_ = rankCum;
-    mem_ = nbits / 8 + basicBlockCount_ * sizeof(uint32);
+    mem_ = nbits / 8 + basicBlockCount_ * sizeof(uint32_t);
 }
 
-uint32 BitmapRankPoppy::rank(uint32 pos)
+uint32_t BitmapRankPoppy::rank(uint32_t pos)
 {
     assert(pos <= nbits_);
-    uint32 blockId = pos >> kBasicBlockBits;
+    uint32_t blockId = pos >> kBasicBlockBits;
     return rankLUT_[blockId] + popcountLinear(bits_, (blockId << 3), (pos & 511));
 }
 
-uint64* BitmapRankPoppy::getBits() {
+uint64_t* BitmapRankPoppy::getBits() {
     return bits_;
 }
 
-uint32 BitmapRankPoppy::getNbits() {
+uint32_t BitmapRankPoppy::getNbits() {
     return nbits_;
 }
 
-uint32 BitmapRankPoppy::getMem() {
+uint32_t BitmapRankPoppy::getMem() {
     return mem_;
 }

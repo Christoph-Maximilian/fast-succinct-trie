@@ -36,39 +36,39 @@ class BitmapSelect {
 public:
     const int kWordSize = 64;
     const int kWordBits = 6;
-    const uint32 kWordMask = ((uint32)1 << kWordBits) - 1;
+    const uint32_t kWordMask = ((uint32_t)1 << kWordBits) - 1;
 
     const int skip = 64;
     const int kSkipBits = 6;
-    const uint32 kSkipMask = ((uint32)1 << kSkipBits) - 1;
+    const uint32_t kSkipMask = ((uint32_t)1 << kSkipBits) - 1;
 
     BitmapSelect() { }
-    virtual uint32 select(uint32 rank) = 0;
+    virtual uint32_t select(uint32_t rank) = 0;
 };
 
 class BitmapSelectPoppy: public BitmapSelect {
 public:
-    BitmapSelectPoppy(uint64* bits, uint32 nbits);
+    BitmapSelectPoppy(uint64_t* bits, uint32_t nbits);
     ~BitmapSelectPoppy() {}
     
-    uint32 select(uint32 rank);
+    uint32_t select(uint32_t rank);
 
-    uint64* getBits();
-    uint32 getNbits();
-    uint32 getMem();
+    uint64_t* getBits();
+    uint32_t getNbits();
+    uint32_t getMem();
 
     friend class FST;
     friend class FSTIter;
 
 private:
-    uint64* bits_;
-    uint32  nbits_;
-    uint32  mem_;
+    uint64_t* bits_;
+    uint32_t  nbits_;
+    uint32_t  mem_;
 
-    uint32  wordCount_;
-    uint32  pCount_;
-    uint32* selectLUT_;
-    uint32  selectLUTCount_;
+    uint32_t  wordCount_;
+    uint32_t  pCount_;
+    uint32_t* selectLUT_;
+    uint32_t  selectLUTCount_;
 };
 
 #endif /* _BITMAPSELECT_H_ */

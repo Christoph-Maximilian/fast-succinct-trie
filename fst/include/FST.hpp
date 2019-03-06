@@ -5,11 +5,11 @@
 #include <algorithm>
 #include <iostream>
 
-#include <common.h>
+#include "./common.h"
 
-#include <bitmap-rank.h>
-#include <bitmap-rankF.h>
-#include <bitmap-select.h>
+#include "./bitmap-rank.h"
+#include "./bitmap-rankF.h"
+#include "./bitmap-select.h"
 
 using namespace std;
 

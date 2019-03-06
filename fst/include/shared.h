@@ -5,10 +5,10 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <inttypes.h>
-
-typedef uint16_t uint16;
-typedef uint32_t uint32;
-typedef uint64_t uint64;
+//todo Christoph commented out
+//typedef uint16_t uint16;
+//typedef uint32_t uint32;
+//typedef uint64_t uint64;
 
 const int kCacheLineSize = 64;
 

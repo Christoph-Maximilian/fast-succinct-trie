@@ -64,5 +64,5 @@ inline int commonPrefixLen(std::string &a, std::string &b) {
     return len;
 }
 
-#endif /* _COMMON_H_ */
+#endif /* _COMMON_H2_ */
 

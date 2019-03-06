@@ -41,34 +41,34 @@ public:
     const int kWordCountPerBasicBlock = kBasicBlockSize / kWordSize;
 
     BitmapRank() { pCount_ = 0; }    
-    virtual uint32 rank(uint32 pos) = 0;
-    uint64 pCount() { return pCount_; }
+    virtual uint32_t rank(uint32_t pos) = 0;
+    uint64_t pCount() { return pCount_; }
     
 protected:
-    uint64 pCount_;
+    uint64_t pCount_;
 };
 
 class BitmapRankPoppy: public BitmapRank {
 public:
-    BitmapRankPoppy(uint64* bits, uint32 nbits);
+    BitmapRankPoppy(uint64_t* bits, uint32_t nbits);
     ~BitmapRankPoppy() {}
     
-    uint32 rank(uint32 pos);
+    uint32_t rank(uint32_t pos);
 
-    uint64* getBits();
-    uint32 getNbits();
-    uint32 getMem();
+    uint64_t* getBits();
+    uint32_t getNbits();
+    uint32_t getMem();
 
     friend class FST;
     friend class FSTIter;
     
 private:
-    uint64* bits_;
-    uint32  nbits_;
-    uint32  mem_;
+    uint64_t* bits_;
+    uint32_t  nbits_;
+    uint32_t  mem_;
 
-    uint32* rankLUT_;
-    uint32  basicBlockCount_;
+    uint32_t* rankLUT_;
+    uint32_t  basicBlockCount_;
 };
 
 #endif /* _BITMAPRANK_H_ */

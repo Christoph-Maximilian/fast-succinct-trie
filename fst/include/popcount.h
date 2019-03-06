@@ -42,7 +42,7 @@
 // http://sux.dsi.unimi.it/paper.pdf p4
 // This variant uses multiplication for the last summation instead of
 // continuing the shift/mask/addition chain.
-inline int suxpopcount(uint64 x) {
+inline int suxpopcount(uint64_t x) {
     // Step 1:  00 - 00 = 0;  01 - 00 = 01; 10 - 01 = 01; 11 - 01 = 10;
     x = x - ((x & G2) >> 1);
     // step 2:  add 2 groups of 2.
@@ -64,10 +64,10 @@ inline int suxpopcount(uint64 x) {
 #define popcountsize 64ULL
 #define popcountmask (popcountsize - 1)
 
-inline uint64 popcountLinear(uint64 *bits, uint64 x, uint64 nbits) {
+inline uint64_t popcountLinear(uint64_t *bits, uint64_t x, uint64_t nbits) {
     if (nbits == 0) { return 0; }
-    uint64 lastword = (nbits - 1) / popcountsize;
-    uint64 p = 0;
+    uint64_t lastword = (nbits - 1) / popcountsize;
+    uint64_t p = 0;
 
     __builtin_prefetch(bits + x + 7, 0); //huanchen
     for (int i = 0; i < lastword; i++) { /* tested;  manually unrolling doesn't help, at least in C */
@@ -78,13 +78,13 @@ inline uint64 popcountLinear(uint64 *bits, uint64 x, uint64 nbits) {
     // 'nbits' may or may not fall on a multiple of 64 boundary,
     // so we may need to zero out the right side of the last word
     // (accomplished by shifting it right, since we're just popcounting)
-    uint64 lastshifted = bits[x+lastword] >> (63 - ((nbits - 1) & popcountmask));
+    uint64_t lastshifted = bits[x+lastword] >> (63 - ((nbits - 1) & popcountmask));
     p += popcount(lastshifted);
     return p;
 }
 
 // Return the index of the kth bit set in x 
-inline int select64_naive(uint64 x, int k) {
+inline int select64_naive(uint64_t x, int k) {
     int count = -1;
     for (int i = 63; i >= 0; i--) {
         count++;
@@ -98,7 +98,7 @@ inline int select64_naive(uint64 x, int k) {
     return -1;
 }
 
-inline int select64_popcount_search(uint64 x, int k) {
+inline int select64_popcount_search(uint64_t x, int k) {
     int loc = -1;
     // if (k > popcount(x)) { return -1; }
 
@@ -115,10 +115,10 @@ inline int select64_popcount_search(uint64 x, int k) {
     return loc+k;
 }
 
-inline int select64_broadword(uint64 x, int k) {
-    uint64 word = x;
+inline int select64_broadword(uint64_t x, int k) {
+    uint64_t word = x;
     int residual = k;
-    register uint64 byte_sums;
+    register uint64_t byte_sums;
     
     byte_sums = word - ( ( word & 0xa * ONES_STEP_4 ) >> 1 );
     byte_sums = ( byte_sums & 3 * ONES_STEP_4 ) + ( ( byte_sums >> 2 ) & 3 * ONES_STEP_4 );
@@ -126,28 +126,28 @@ inline int select64_broadword(uint64 x, int k) {
     byte_sums *= ONES_STEP_8;
     
     // Phase 2: compare each byte sum with the residual
-    const uint64 residual_step_8 = residual * ONES_STEP_8;
+    const uint64_t residual_step_8 = residual * ONES_STEP_8;
     const int place = ( LEQ_STEP_8( byte_sums, residual_step_8 ) * ONES_STEP_8 >> 53 ) & ~0x7;
     
     // Phase 3: Locate the relevant byte and make 8 copies with incremental masks
     const int byte_rank = residual - ( ( ( byte_sums << 8 ) >> place ) & 0xFF );
     
-    const uint64 spread_bits = ( word >> place & 0xFF ) * ONES_STEP_8 & INCR_STEP_8;
-    const uint64 bit_sums = ZCOMPARE_STEP_8( spread_bits ) * ONES_STEP_8;
+    const uint64_t spread_bits = ( word >> place & 0xFF ) * ONES_STEP_8 & INCR_STEP_8;
+    const uint64_t bit_sums = ZCOMPARE_STEP_8( spread_bits ) * ONES_STEP_8;
     
     // Compute the inside-byte location and return the sum
-    const uint64 byte_rank_step_8 = byte_rank * ONES_STEP_8;
+    const uint64_t byte_rank_step_8 = byte_rank * ONES_STEP_8;
     
     return place + ( LEQ_STEP_8( bit_sums, byte_rank_step_8 ) * ONES_STEP_8 >> 56 );   
 }
 
-inline int select64(uint64 x, int k) {
+inline int select64(uint64_t x, int k) {
     return select64_popcount_search(x, k);
 }
 
 // x is the starting offset of the 512 bits;
 // k is the thing we're selecting for.
-inline int select512(uint64 *bits, int x, int k) {
+inline int select512(uint64_t *bits, int x, int k) {
     __asm__ __volatile__ (
                           "prefetchnta (%0)\n"
                           : : "r" (&bits[x]) );
@@ -169,11 +169,11 @@ inline int select512(uint64 *bits, int x, int k) {
 // x is the starting offset of the bits in bv;
 // k is the thing we're selecting for (starting from bv[x]).
 // bvlen is the total length of bv
-inline uint64 selectLinear(uint64* bits, uint64 length, uint64 x, uint64 k) {
+inline uint64_t selectLinear(uint64_t* bits, uint64_t length, uint64_t x, uint64_t k) {
     if (k > (length - x) * 64)
         return -1;
-    uint64 i = 0;
-    uint64 pop = popcount(bits[x+i]);
+    uint64_t i = 0;
+    uint64_t pop = popcount(bits[x+i]);
     while (k > pop && i < (length - 1)) {
         k -= pop;
         i++;
