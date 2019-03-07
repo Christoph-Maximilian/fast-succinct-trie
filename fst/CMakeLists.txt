@@ -4,7 +4,7 @@ project(fst)
 message(STATUS "Configuring..." ${CMAKE_PROJECT_NAME})
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O9  -mpopcnt -pthread -std=c++14") #-Werror
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g   -mpopcnt -pthread -std=c++14") #-Werror -O9
 
 # TODO: remove those compile flask before benchmarking (those are for optimizing code - not good for debugging)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")

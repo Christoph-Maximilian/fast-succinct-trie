@@ -611,6 +611,10 @@ inline bool FST::nodeSearch_lowerBound(uint64_t &pos, int size, uint8_t target) 
 //******************************************************
 // LOOKUP
 //******************************************************
+
+
+uint8_t level_masks[4] = {0xC0, 0xF0, 0xFC, 0xFF};
+
 bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     int keypos = 0;
     uint64_t nodeNum = 0;
@@ -619,16 +623,30 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
     while (keypos < keylen && keypos < cutoff_level_) {
         kc = (uint8_t) key[keypos];
+        //Todo: Check if parent cell ids are in node - this pos calculation is
+        // important since kc is the key, e.g.'k'
         pos = (nodeNum << 8) + kc;
 
         __builtin_prefetch(tbitsU_->bits_ + (nodeNum << 2) + (kc >> 6), 0);
         __builtin_prefetch(tbitsU_->rankLUT_ + ((pos + 1) >> 6), 0);
 
-        if (!isCbitSetU(nodeNum, kc))
-            return false;
-
+        if (!isCbitSetU(nodeNum, kc)) { //does it have a child
+            // this key does not have a child - check if a parent polygon is present in this node
+            bool parent_cell_found = false;
+            for (auto &mask : level_masks) {
+                auto modified_kc = kc & mask;
+                if (isCbitSetU(nodeNum, modified_kc)) {
+                    parent_cell_found = true;
+                    //TODO: optimization - i think this is not necessary - if parent found -> TBit will be set !?!?!
+                    kc = modified_kc;
+                    pos = (nodeNum << 8) + kc;
+                    break;
+                }
+            }
+            if (!parent_cell_found) { return false; }
+        }
         if (!isTbitSetU(nodeNum, kc)) {
-            //Christoph: i think this returns if the current prefix
+            //Christoph: i think this returns if the current prefix ends
             value = valuesU_[valuePosU(nodeNum, pos)];
             return true;
         }
@@ -649,13 +667,32 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     pos = (cutoff_level_ == 0) ? 0 : childpos(nodeNum);
 
     while (keypos < keylen) {
+        // TODO : check if this if statement is really necessary!
+        if (cbytes_[pos] == TERM && !isTbitSet(pos)) {
+            value = values_[valuePos(pos)];
+            std::cout << "this code is really needed";
+            return true;
+        }
+
         kc = (uint8_t) key[keypos];
 
         int nsize = nodeSize(pos);
-        if (!nodeSearch(pos, nsize, kc))
+        auto pos_tmp = pos;
+        if (!nodeSearch(pos, nsize, kc)) {
             // TODO: we did not find the exact key, but how about parent S2 Cells??
             // TODO: check for parent S2 Cells
-            return false;
+            bool parent_cell_found = false;
+            for (auto &mask : level_masks) {
+                auto modified_kc = kc & mask;
+                pos = pos_tmp;
+                if (nodeSearch(pos, nsize, modified_kc)) {
+                    std::cout << "parent level found";
+                    parent_cell_found = true;
+                    break;
+                }
+            }
+            if (!parent_cell_found) { return false; }
+        }
 
         if (!isTbitSet(pos)) {
             value = values_[valuePos(pos)];
@@ -978,12 +1015,12 @@ void FST::print() {
     int s_pos = 0;
     int value_pos = 0;
 
-    cout << "\n======================================================\n\n";
+    cout << "\n======================C-BYTES================================\n\n";
 
     for (int i = 0; i < c_mem_; i++)
         cout << "(" << i << ")" << cbytes_[i] << " ";
 
-    cout << "\n======================================================\n\n";
+    cout << "\n======================T-BITS================================\n\n";
     for (int i = 0; i < c_mem_; i++) {
         if (readBit(tbits_->getBits()[i / 64], i % 64))
             cout << "(" << i << ")" << "1 ";
@@ -991,7 +1028,7 @@ void FST::print() {
             cout << "(" << i << ")" << "0 ";
     }
 
-    cout << "\n======================================================\n\n";
+    cout << "\n=====================S-BITS=================================\n\n";
     for (int i = 0; i < c_mem_; i++) {
         if (readBit(sbits_->getBits()[i / 64], i % 64))
             cout << "(" << i << ")" << "1 ";
@@ -999,7 +1036,7 @@ void FST::print() {
             cout << "(" << i << ")" << "0 ";
     }
 
-    cout << "\n======================================================\n\n";
+    cout << "\n=====================VALUES=================================\n\n";
     for (int i = 0; i < val_mem_ / 8; i++) {
         cout << "(" << i << ")" << values_[i] << " ";
     }

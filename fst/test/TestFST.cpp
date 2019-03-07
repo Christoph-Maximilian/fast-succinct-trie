@@ -108,7 +108,7 @@ TEST_F(UnitTest, LookupTest) {
     printStatFST(index);
 
     uint64_t fetchedValue;
-    for (int i = 0; i < TEST_SIZE; i++) {
+    for (int i = TEST_SIZE - 1; i >= 0; i--) {
         if (i > 0 && keys[i].compare(keys[i - 1]) == 0)
             continue;
         ASSERT_TRUE(index->lookup((uint8_t *) keys[i].c_str(), keys[i].length(), fetchedValue));
@@ -213,14 +213,6 @@ TEST_F(UnitTest, ScanMonoIntTest) {
 }
 
 TEST_F(UnitTest, LookupTestExample) {
-    /*
-     * bri = 0
-     * eng = 1
-     * fra = 2
-     * ger = 3
-     * gre = 4
-     * ita = 5
-     */
     vector<string> keys;
     vector<uint64_t> values;
     int longestKeyLen = loadFile(testFileExamplePath, keys, values);
@@ -233,11 +225,14 @@ TEST_F(UnitTest, LookupTestExample) {
     //print values saved in fst
 
     uint64_t fetchedValue;
-    ASSERT_TRUE(index->lookup((uint8_t *) "greek", 5, fetchedValue));
-    ASSERT_EQ(3, fetchedValue);
+    ASSERT_TRUE(index->lookup((uint8_t *) "abcP", 5, fetchedValue));
+    ASSERT_EQ(13, fetchedValue);
+    ASSERT_TRUE(index->lookup((uint8_t *) "abcSDfasdf", 10, fetchedValue));
+    ASSERT_EQ(13, fetchedValue);
 
-    ASSERT_TRUE(index->lookup((uint8_t *) "england", 7, fetchedValue));
+    ASSERT_TRUE(index->lookup((uint8_t *) "SS", 2, fetchedValue));
     ASSERT_EQ(1, fetchedValue);
+
 
 
 }
