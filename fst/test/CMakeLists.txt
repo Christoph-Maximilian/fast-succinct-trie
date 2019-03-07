@@ -9,3 +9,6 @@ function (add_fst_test file_name )
 endfunction()
 
 add_fst_test(TestFST)
+
+configure_file(bulkload_sort test/bulkload_sort COPYONLY)
+configure_file(bulkload_example test/bulkload_example COPYONLY)

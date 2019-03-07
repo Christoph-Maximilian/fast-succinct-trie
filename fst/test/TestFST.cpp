@@ -13,8 +13,8 @@
 
 using namespace std;
 
-const string testFilePath = "../../test/bulkload_sort";
-const string testFileExamplePath = "../../test/bulkload_example";
+const string testFilePath = "test/bulkload_sort";
+const string testFileExamplePath = "test/bulkload_example";
 
 class UnitTest : public ::testing::Test {
 public:
@@ -234,7 +234,7 @@ TEST_F(UnitTest, LookupTestExample) {
 
     uint64_t fetchedValue;
     ASSERT_TRUE(index->lookup((uint8_t *) "greek", 5, fetchedValue));
-    ASSERT_EQ(4, fetchedValue);
+    ASSERT_EQ(3, fetchedValue);
 
     ASSERT_TRUE(index->lookup((uint8_t *) "england", 7, fetchedValue));
     ASSERT_EQ(1, fetchedValue);

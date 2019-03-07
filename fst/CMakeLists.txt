@@ -4,7 +4,7 @@ project(fst)
 message(STATUS "Configuring..." ${CMAKE_PROJECT_NAME})
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O9  -mpopcnt -pthread -std=c++11") #-Werror
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -O9  -mpopcnt -pthread -std=c++14") #-Werror
 
 # TODO: remove those compile flask before benchmarking (those are for optimizing code - not good for debugging)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
@@ -15,17 +15,18 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 add_subdirectory(src)
 add_subdirectory(test)
 
-add_library(fstlib SHARED
-        src/FST.cpp
-        src/bitmap-rank.cc
-        src/bitmap-rankF.cc
-        src/bitmap-select.cc
-        include/bitmap-rank.h
-        include/bitmap-rankF.h
-        include/bitmap-select.h
-        include/common.h
-        include/FST.hpp
-        include/popcount.h
-        include/shared.h)
+#add_library(fstlib SHARED
+#        src/FST.cpp
+#        src/bitmap-rank.cc
+#        src/bitmap-rankF.cc
+#        src/bitmap-select.cc
+#        include/bitmap-rank.h
+#        include/bitmap-rankF.h
+#        include/bitmap-select.h
+#        include/common.h
+#        include/FST.hpp
+#        include/popcount.h
+#        include/shared.h
+#        )
 
-#target_include_directories(fst  ..)
+#target_include_directories(fstlib PUBLIC ..)

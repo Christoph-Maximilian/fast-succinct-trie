@@ -649,10 +649,6 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     pos = (cutoff_level_ == 0) ? 0 : childpos(nodeNum);
 
     while (keypos < keylen) {
-        if (cbytes_[pos] == TERM && !isTbitSet(pos)) {
-            value = values_[valuePos(pos)];
-            return true;
-        }
         kc = (uint8_t) key[keypos];
 
         int nsize = nodeSize(pos);

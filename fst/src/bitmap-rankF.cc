@@ -33,7 +33,7 @@ BitmapRankFPoppy::BitmapRankFPoppy(uint64_t *bits, uint32_t nbits)
     bits_ = bits;
     nbits_ = nbits;
     basicBlockCount_ = nbits_ / kBasicBlockSize;
-
+    rankLUT_ = new uint32_t[basicBlockCount_];
     assert(posix_memalign((void **) &rankLUT_, kCacheLineSize, basicBlockCount_ * sizeof(uint32_t)) >= 0);
 
     uint32_t rankCum = 0;
