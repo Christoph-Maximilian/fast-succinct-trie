@@ -1,4 +1,5 @@
 #include <FST.hpp>
+#include <bitset>
 
 FST::FST() : cutoff_level_(0), nodeCountU_(0), childCountU_(0),
              cbitsU_(NULL), tbitsU_(NULL), obitsU_(NULL), valuesU_(NULL),
@@ -115,6 +116,13 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
 
     int last_value_level = 0;
     for (int k = 0; k < (int) keys.size(); k++) {
+        /*
+        std::cout << "KEY: ";
+        for (auto i = 0; i < keys[k].size(); i++) {
+            std::cout << +keys[k][i] << "-";
+        }
+        std::cout << std::endl;
+        */
         string key = keys[k];
         uint64_t value = values[k];
 
@@ -329,7 +337,8 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
 
     cbytes_ = new uint8_t[c_mem_];
     uint64_t *tbits = new uint64_t[t_mem_];
-    uint64_t *sbits = new uint64_t[s_mem_];
+    // for the corner case that the last 1 bit needs a new byte - add just 1 byte to sbits
+    uint64_t *sbits = new uint64_t[s_mem_ + 1];
     values_ = new uint64_t[val_mem_ / sizeof(uint64_t)];
 
     // init
@@ -380,6 +389,9 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
             }
         }
     }
+
+    // Todo: use s_bit_Pos to set a last 1 bit
+    setBit(sbits[s_bitPos / 64], s_bitPos % 64);
 
     sbits_ = new BitmapSelectPoppy(sbits, s_mem_ * 64);
     s_mem_ = sbits_->getMem(); //stat
@@ -477,11 +489,17 @@ inline uint64_t FST::childpos(uint64_t nodeNum) {
 //******************************************************
 inline int FST::nodeSize(uint64_t pos) {
     pos++;
+    //shift 6 to right, because 2^6 = 64 == 1 uint64_t,
     uint64_t startIdx = pos >> 6;
+    // for the shift, only the six lowest level bits are relevant
     uint64_t shift = pos & (uint64_t) 0x3F;
-
-    uint64_t bits = sbits_->bits_[startIdx] << shift;
-    if (bits > 0)
+    uint64_t bits = sbits_->bits_[startIdx];
+    std::bitset<64> sbit_vector(bits);
+    std::cout << "S-BITS: " << sbit_vector << std::endl;
+    bits = sbits_->bits_[startIdx] << shift;
+    std::bitset<64> sbit_vector1(bits);
+    std::cout << "S-BITS[SHIFTED] " << sbit_vector1 << std::endl;
+    if (bits > 0) //counting the number of leading zeros + 1 = nodesize
         return __builtin_clzll(bits) + 1;
 
     for (int i = 1; i < 5; i++) {
@@ -612,11 +630,17 @@ inline bool FST::nodeSearch_lowerBound(uint64_t &pos, int size, uint8_t target) 
 // LOOKUP
 //******************************************************
 
-
-uint8_t level_masks[4] = {0xC0, 0xF0, 0xFC, 0xFF};
+//Todo: no need for first one?
+uint8_t level_masks[3] = {0xFC, 0xF0, 0xC0};
+uint8_t level_masks_last_flag[3] = {0x02, 0x08, 0x20};
 
 bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     int keypos = 0;
+    /*std::cout << "KEY: ";
+    for (auto i = 0; i < keylen; i++) {
+        std::cout << +key[i] << "-";
+    }*/
+    std::cout << std::endl;
     uint64_t nodeNum = 0;
     uint8_t kc = (uint8_t) key[keypos];
     uint64_t pos = kc;
@@ -633,11 +657,13 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         if (!isCbitSetU(nodeNum, kc)) { //does it have a child
             // this key does not have a child - check if a parent polygon is present in this node
             bool parent_cell_found = false;
-            for (auto &mask : level_masks) {
-                auto modified_kc = kc & mask;
+            for (auto i = 0; i < 3; i++) {
+                auto modified_kc = (kc & level_masks[i]) | level_masks_last_flag[i];
                 if (isCbitSetU(nodeNum, modified_kc)) {
                     parent_cell_found = true;
-                    //TODO: optimization - i think this is not necessary - if parent found -> TBit will be set !?!?!
+                    //TODO: do we need a check here if T bit is set?
+                    // && !isTbitSet(pos)
+
                     kc = modified_kc;
                     pos = (nodeNum << 8) + kc;
                     break;
@@ -667,26 +693,28 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     pos = (cutoff_level_ == 0) ? 0 : childpos(nodeNum);
 
     while (keypos < keylen) {
-        // TODO : check if this if statement is really necessary!
+        // this if statement is needed
         if (cbytes_[pos] == TERM && !isTbitSet(pos)) {
             value = values_[valuePos(pos)];
-            std::cout << "this code is really needed";
             return true;
         }
 
         kc = (uint8_t) key[keypos];
 
         int nsize = nodeSize(pos);
+
         auto pos_tmp = pos;
         if (!nodeSearch(pos, nsize, kc)) {
             // TODO: we did not find the exact key, but how about parent S2 Cells??
             // TODO: check for parent S2 Cells
             bool parent_cell_found = false;
-            for (auto &mask : level_masks) {
-                auto modified_kc = kc & mask;
+            for (auto i = 0; i < 3; i++) {
+                auto modified_kc = (kc & level_masks[i]) | level_masks_last_flag[i];
                 pos = pos_tmp;
-                if (nodeSearch(pos, nsize, modified_kc)) {
-                    std::cout << "parent level found";
+                if (nodeSearch(pos, nsize, modified_kc) && !isTbitSet(pos)) {
+                    //TOdo CHECK if T Bit is not set?!
+                    // important -> found S2-parent must not go on in next child
+                    // otherwise the last 1 is no in this node
                     parent_cell_found = true;
                     break;
                 }
@@ -695,6 +723,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         }
 
         if (!isTbitSet(pos)) {
+            //todo careful - we read out of bitvector here
             value = values_[valuePos(pos)];
             return true;
         }
@@ -707,7 +736,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         __builtin_prefetch(tbits_->rankLUT_ + ((pos + 1) >> 9), 0);
     }
 
-    //TODO: this is the important part -> here we detect that
+    //TODO: this is the important part -> here we detect that , added by @Christoph
     if (cbytes_[pos] == TERM && !isTbitSet(pos)) {
         value = values_[valuePos(pos)];
         return true;
@@ -1018,7 +1047,7 @@ void FST::print() {
     cout << "\n======================C-BYTES================================\n\n";
 
     for (int i = 0; i < c_mem_; i++)
-        cout << "(" << i << ")" << cbytes_[i] << " ";
+        cout << "(" << i << ")" << +cbytes_[i] << " ";
 
     cout << "\n======================T-BITS================================\n\n";
     for (int i = 0; i < c_mem_; i++) {
