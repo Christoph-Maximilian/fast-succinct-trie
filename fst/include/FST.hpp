@@ -19,7 +19,7 @@ class FST;
 class FST {
 public:
     static const uint8_t TERM = 36; //$
-    static const int CUTOFF_RATIO = 64;
+    static const int CUTOFF_RATIO = 100000; //;64
 
     FST();
     virtual ~FST();
@@ -53,6 +53,7 @@ public:
 
     void printU();
     void print();
+    void print_csv();
 
 private:
     inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, int &pos, int &nc);

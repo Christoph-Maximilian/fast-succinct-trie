@@ -240,8 +240,8 @@ TEST_F(UnitTest, LookupS2Prefixes) {
 
     FST *index = new FST();
     index->load(keys, values, longestKeyLen);
-    index->print();
-    printStatFST(index);
+    //index->print();
+    //printStatFST(index);
 
     //print values saved in fst
     uint64_t fetchedValue;
@@ -263,9 +263,9 @@ TEST_F(UnitTest, LookupS2Prefixes) {
     vector<string> point_keys;
     vector<uint64_t> _;
     loadPolygonIdsFile(point_keys, _, testPointsIdsPath);
-    for (int i = 126; i < 127; i++) {
+    for (int i = 0; i < 128; i++) {
         auto keystring = point_keys[i];
-        std::cout << keystring << std::endl;
+        //std::cout << keystring << std::endl;
         ASSERT_TRUE(index->lookup(reinterpret_cast<uint8_t *>(&keystring[0]), keystring.size(), fetchedValue));
         ASSERT_EQ(i, fetchedValue);
     }

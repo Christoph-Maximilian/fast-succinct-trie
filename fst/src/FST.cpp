@@ -494,11 +494,11 @@ inline int FST::nodeSize(uint64_t pos) {
     // for the shift, only the six lowest level bits are relevant
     uint64_t shift = pos & (uint64_t) 0x3F;
     uint64_t bits = sbits_->bits_[startIdx];
-    std::bitset<64> sbit_vector(bits);
-    std::cout << "S-BITS: " << sbit_vector << std::endl;
+    //std::bitset<64> sbit_vector(bits);
+    //std::cout << "S-BITS: " << sbit_vector << std::endl;
     bits = sbits_->bits_[startIdx] << shift;
-    std::bitset<64> sbit_vector1(bits);
-    std::cout << "S-BITS[SHIFTED] " << sbit_vector1 << std::endl;
+    //std::bitset<64> sbit_vector1(bits);
+    //std::cout << "S-BITS[SHIFTED] " << sbit_vector1 << std::endl;
     if (bits > 0) //counting the number of leading zeros + 1 = nodesize
         return __builtin_clzll(bits) + 1;
 
@@ -540,7 +540,7 @@ inline bool FST::simdSearch(uint64_t &pos, uint64_t size, uint8_t target) {
 }
 
 //******************************************************
-// BINARY SEARCH
+// BINARY SEARCH does not work :( so sad
 //******************************************************
 inline bool FST::binarySearch(uint64_t &pos, uint64_t size, uint8_t target) {
     uint64_t l = pos;
@@ -610,7 +610,8 @@ inline bool FST::linearSearch_lowerBound(uint64_t &pos, uint64_t size, uint8_t t
 // NODE SEARCH
 //******************************************************
 inline bool FST::nodeSearch(uint64_t &pos, int size, uint8_t target) {
-    if (size < 3)
+    //Todo: Fix the binary search algorithm
+    if (size < 5000)
         return linearSearch(pos, size, target);
     else if (size < 12)
         return binarySearch(pos, size, target);
@@ -639,8 +640,9 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     /*std::cout << "KEY: ";
     for (auto i = 0; i < keylen; i++) {
         std::cout << +key[i] << "-";
+        std::cout << std::endl;
     }*/
-    std::cout << std::endl;
+
     uint64_t nodeNum = 0;
     uint8_t kc = (uint8_t) key[keypos];
     uint64_t pos = kc;
@@ -648,7 +650,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     while (keypos < keylen && keypos < cutoff_level_) {
         kc = (uint8_t) key[keypos];
         //Todo: Check if parent cell ids are in node - this pos calculation is
-        // important since kc is the key, e.g.'k'
+        // important since kc is the key, e.g.'b'
         pos = (nodeNum << 8) + kc;
 
         __builtin_prefetch(tbitsU_->bits_ + (nodeNum << 2) + (kc >> 6), 0);
@@ -1034,6 +1036,40 @@ void FST::printU() {
     cout << "\n======================================================\n\n";
     for (int i = 0; i < val_memU_ / 8; i++) {
         cout << valuesU_[i] << " ";
+    }
+    cout << "\n";
+}
+
+void FST::print_csv() {
+    int c_pos = 0;
+    int v_pos = 0;
+    int s_pos = 0;
+    int value_pos = 0;
+
+    cout << "\n======================C-BYTES================================\n\n";
+
+    for (int i = 0; i < c_mem_; i++)
+        cout << +cbytes_[i] << ",";
+
+    cout << "\n======================T-BITS================================\n\n";
+    for (int i = 0; i < c_mem_; i++) {
+        if (readBit(tbits_->getBits()[i / 64], i % 64))
+            cout << "1,";
+        else
+            cout << "0,";
+    }
+
+    cout << "\n=====================S-BITS=================================\n\n";
+    for (int i = 0; i < c_mem_; i++) {
+        if (readBit(sbits_->getBits()[i / 64], i % 64))
+            cout << "1,";
+        else
+            cout << "0,";
+    }
+
+    cout << "\n=====================VALUES=================================\n\n";
+    for (int i = 0; i < val_mem_ / 8; i++) {
+        cout << values_[i] << ",";
     }
     cout << "\n";
 }
