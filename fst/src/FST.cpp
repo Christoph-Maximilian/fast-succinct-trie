@@ -625,8 +625,8 @@ inline bool FST::nodeSearch_lowerBound(uint64_t &pos, int size, uint8_t target) 
 //******************************************************
 
 //Todo: no need for first one?
-uint8_t level_masks[3] = {0xFC, 0xF0, 0xC0};
-uint8_t level_masks_last_flag[3] = {0x02, 0x08, 0x20};
+uint8_t level_masks[4] = {0xFC, 0xF0, 0xC0, 0x00};
+uint8_t level_masks_last_flag[4] = {0x02, 0x08, 0x20, 0x80};
 
 bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     int keypos = 0;
@@ -652,7 +652,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         if (!isCbitSetU(nodeNum, kc)) { //does it have a child
             // this key does not have a child - check if a parent polygon is present in this node
             bool parent_cell_candidate_found = false;
-            for (auto i = 0; i < 3; i++) {
+            for (auto i = 0; i < 4; i++) {
                 auto modified_kc = (kc & level_masks[i]) | level_masks_last_flag[i];
                 if (isCbitSetU(nodeNum, modified_kc)) {
                     parent_cell_candidate_found = true;
@@ -707,7 +707,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
             // TODO: we did not find the exact key, but how about parent S2 Cells??
             // TODO: check for parent S2 Cells
             bool parent_cell_candidate_found = false;
-            for (auto i = 0; i < 3; i++) {
+            for (auto i = 0; i < 4; i++) {
                 auto modified_kc = (kc & level_masks[i]) | level_masks_last_flag[i];
                 pos = pos_tmp;
                 if (nodeSearch(pos, nsize, modified_kc) && !isTbitSet(pos)) {
