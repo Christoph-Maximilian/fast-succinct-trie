@@ -116,13 +116,6 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
 
     int last_value_level = 0;
     for (int k = 0; k < (int) keys.size(); k++) {
-        /*
-        std::cout << "KEY: ";
-        for (auto i = 0; i < keys[k].size(); i++) {
-            std::cout << +keys[k][i] << "-";
-        }
-        std::cout << std::endl;
-        */
         string key = keys[k];
         uint64_t value = values[k];
 
@@ -131,30 +124,34 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
             continue;
 
         int i = 0;
-        while (i < key.length() && !insertChar_cond((uint8_t) key[i], c[i], t[i], s[i], pos_list[i], nc[i]))
+        while (i < key.length() && !insertChar_cond((uint8_t) key[i], c[i], t[i], s[i], pos_list[i], nc[i])) {
+            //insertChar_cond((uint8_t)key[i], c[i], t[i], s[i], pos_list[i], nc[i]);
             i++;
+        }
+
 
         if (i < key.length()) {
-            if (k + 1 < (int) keys.size()) {
-                int cpl = commonPrefixLen(key, keys[k + 1]);
-                if (i < cpl) {
+            if (k + 1 < (int) keys.size() or true) {
+                int cpl = key.length(); //commonPrefixLen(key, keys[k + 1]);
+                if (i < (cpl - 1)) {
+                    // There will be a child node -> set T bit of corresponding position within node
                     if (pos_list[i] % 64 == 0)
                         setBit(t[i].rbegin()[1], 63);
                     else
                         setBit(t[i].back(), (pos_list[i] - 1) % 64);
                 }
 
-                while (i < cpl) {
+                while (i < (cpl - 1)) {
                     i++;
-                    if (i < cpl)
+                    if (i < (cpl - 1))
                         insertChar((uint8_t) key[i], false, c[i], t[i], s[i], pos_list[i], nc[i]);
                     else {
-                        if (i < key.length())
-                            insertChar((uint8_t) key[i], true, c[i], t[i], s[i], pos_list[i], nc[i]);
-                        else {
+                        //if (i < key.length())
+                        insertChar((uint8_t) key[i], true, c[i], t[i], s[i], pos_list[i], nc[i]);
+                        /*else {
                             insertChar(TERM, true, c[i], t[i], s[i], pos_list[i], nc[i]);
-                            num_t_++; //stat
-                        }
+                            num_t_++; //stat number terms
+                        }*/
                     }
                 }
             }
@@ -337,8 +334,7 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
 
     cbytes_ = new uint8_t[c_mem_];
     uint64_t *tbits = new uint64_t[t_mem_];
-    // for the corner case that the last 1 bit needs a new byte - add just 1 byte to sbits
-    uint64_t *sbits = new uint64_t[s_mem_ + 1];
+    uint64_t *sbits = new uint64_t[s_mem_];
     values_ = new uint64_t[val_mem_ / sizeof(uint64_t)];
 
     // init
@@ -389,9 +385,6 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
             }
         }
     }
-
-    // Todo: use s_bit_Pos to set a last 1 bit
-    setBit(sbits[s_bitPos / 64], s_bitPos % 64);
 
     sbits_ = new BitmapSelectPoppy(sbits, s_mem_ * 64);
     s_mem_ = sbits_->getMem(); //stat
@@ -658,11 +651,11 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
         if (!isCbitSetU(nodeNum, kc)) { //does it have a child
             // this key does not have a child - check if a parent polygon is present in this node
-            bool parent_cell_found = false;
+            bool parent_cell_candidate_found = false;
             for (auto i = 0; i < 3; i++) {
                 auto modified_kc = (kc & level_masks[i]) | level_masks_last_flag[i];
                 if (isCbitSetU(nodeNum, modified_kc)) {
-                    parent_cell_found = true;
+                    parent_cell_candidate_found = true;
                     //TODO: do we need a check here if T bit is set?
                     // && !isTbitSet(pos)
 
@@ -671,7 +664,15 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
                     break;
                 }
             }
-            if (!parent_cell_found) { return false; }
+            if (!parent_cell_candidate_found) { return false; }
+            // T bit must not be set -> otherwise the parent has a next child ->
+            // in this case the last one is not the last flag but a legal 1
+            if (!isTbitSetU(nodeNum, kc)) {
+                //Christoph: i think this returns if the current prefix ends
+                value = valuesU_[valuePosU(nodeNum, pos)];
+                return true;
+            }
+            return false;
         }
         if (!isTbitSetU(nodeNum, kc)) {
             //Christoph: i think this returns if the current prefix ends
@@ -695,11 +696,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     pos = (cutoff_level_ == 0) ? 0 : childpos(nodeNum);
 
     while (keypos < keylen) {
-        // this if statement is needed
-        if (cbytes_[pos] == TERM && !isTbitSet(pos)) {
-            value = values_[valuePos(pos)];
-            return true;
-        }
+
 
         kc = (uint8_t) key[keypos];
 
@@ -709,7 +706,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         if (!nodeSearch(pos, nsize, kc)) {
             // TODO: we did not find the exact key, but how about parent S2 Cells??
             // TODO: check for parent S2 Cells
-            bool parent_cell_found = false;
+            bool parent_cell_candidate_found = false;
             for (auto i = 0; i < 3; i++) {
                 auto modified_kc = (kc & level_masks[i]) | level_masks_last_flag[i];
                 pos = pos_tmp;
@@ -717,11 +714,19 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
                     //TOdo CHECK if T Bit is not set?!
                     // important -> found S2-parent must not go on in next child
                     // otherwise the last 1 is no in this node
-                    parent_cell_found = true;
+                    parent_cell_candidate_found = true;
                     break;
                 }
             }
-            if (!parent_cell_found) { return false; }
+            if (!parent_cell_candidate_found) { return false; }
+            // T bit must not be set -> otherwise the parent has a next child ->
+            // in this case the last one is not the last flag but a legal 1
+            if (!isTbitSet(pos)) {
+                //todo careful - we read out of bitvector here
+                value = values_[valuePos(pos)];
+                return true;
+            }
+            return false;
         }
 
         if (!isTbitSet(pos)) {
@@ -739,7 +744,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     }
 
     //TODO: this is the important part -> here we detect that , added by @Christoph
-    if (cbytes_[pos] == TERM && !isTbitSet(pos)) {
+    if (!isTbitSet(pos)) {
         value = values_[valuePos(pos)];
         return true;
     }
