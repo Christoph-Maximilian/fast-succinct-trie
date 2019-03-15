@@ -217,19 +217,15 @@ TEST_F(UnitTest, LookupTestExample) {
 
     FST *index = new FST();
     index->load(keys, values, longestKeyLen);
-
+    index->print_csv();
     printStatFST(index);
-
+    std::string key = "grape";
+    uint64_t value;
+    index->lookup(reinterpret_cast<uint8_t *>(&(key[0])), key.size(), value);
     //print values saved in fst
 
     uint64_t fetchedValue;
-    ASSERT_TRUE(index->lookup((uint8_t *) "abcP", 5, fetchedValue));
-    ASSERT_EQ(13, fetchedValue);
-    ASSERT_TRUE(index->lookup((uint8_t *) "abcSDfasdf", 10, fetchedValue));
-    ASSERT_EQ(13, fetchedValue);
 
-    ASSERT_TRUE(index->lookup((uint8_t *) "SS", 2, fetchedValue));
-    ASSERT_EQ(1, fetchedValue);
 
 }
 
@@ -275,64 +271,3 @@ int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
-
-
-
-
-/*
-TEST_F(UnitTest, LookupTest) {
-    vector<string> keys;
-    vector<uint64_t> values;
-    int longestKeyLen = loadFile(testFilePath, keys, values);
-
-    FST *index = new FST();
-    index->load(keys, values, longestKeyLen);
-
-    printStatFST(index);
-
-    uint64_t fetchedValue;
-    for (int i = TEST_SIZE - 1; i >= 0; i--) {
-        if (i > 0 && keys[i].compare(keys[i - 1]) == 0)
-            continue;
-        ASSERT_TRUE(index->lookup((uint8_t *) keys[i].c_str(), keys[i].length(), fetchedValue));
-        ASSERT_EQ(values[i], fetchedValue);
-    }
-}
-
-
-TEST_F(UnitTest, LookupMonoIntTest) {
-    vector<uint64_t> keys;
-    int longestKeyLen = loadMonoInt(keys);
-
-    FST *index = new FST();
-    index->load(keys, keys);
-
-    printStatFST(index);
-
-    uint64_t fetchedValue;
-    for (uint64_t i = 0; i < TEST_SIZE; i++) {
-        ASSERT_TRUE(index->lookup(keys[i], fetchedValue));
-        ASSERT_EQ(keys[i], fetchedValue);
-    }
-}
-
-
-TEST_F(UnitTest, LookupRandIntTest) {
-    vector<uint64_t> keys;
-    int longestKeyLen = loadRandInt(keys);
-
-    FST *index = new FST();
-    index->load(keys, keys);
-
-    printStatFST(index);
-
-    random_shuffle(keys.begin(), keys.end());
-
-    uint64_t fetchedValue;
-
-    for (uint64_t i = 0; i < TEST_SIZE; i++) {
-        ASSERT_TRUE(index->lookup(keys[i], fetchedValue));
-        ASSERT_EQ(keys[i], fetchedValue);
-    }
-}
-*/

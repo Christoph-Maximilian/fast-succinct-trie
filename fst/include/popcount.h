@@ -56,6 +56,7 @@ inline int suxpopcount(uint64_t x) {
 
 // Default to using the GCC builtin popcount.  On architectures
 // with -march popcnt, this compiles to a single popcnt instruction.
+// popcount(x) = number of 1 bits in x
 #ifndef popcount
 #define popcount __builtin_popcountll
 //#define popcount suxpopcount
@@ -64,6 +65,7 @@ inline int suxpopcount(uint64_t x) {
 #define popcountsize 64ULL
 #define popcountmask (popcountsize - 1)
 
+// x is the basic block id (multiple of 8)
 inline uint64_t popcountLinear(uint64_t *bits, uint64_t x, uint64_t nbits) {
     if (nbits == 0) { return 0; }
     uint64_t lastword = (nbits - 1) / popcountsize;

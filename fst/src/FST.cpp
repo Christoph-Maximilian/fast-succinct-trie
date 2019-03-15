@@ -1,12 +1,13 @@
 #include <FST.hpp>
 #include <bitset>
+#include <fstream>
 
 FST::FST() : cutoff_level_(0), nodeCountU_(0), childCountU_(0),
              cbitsU_(NULL), tbitsU_(NULL), obitsU_(NULL), valuesU_(NULL),
              cbytes_(NULL), tbits_(NULL), sbits_(NULL), values_(NULL),
              tree_height_(0), last_value_pos_(0),
              c_lenU_(0), o_lenU_(0), c_memU_(0), t_memU_(0), o_memU_(0), val_memU_(0),
-             c_mem_(0), t_mem_(0), s_mem_(0), val_mem_(0), num_t_(0) {}
+             c_mem_(0), t_mem_(0), s_mem_(0), val_mem_(0), num_t_(0), number_values(0) {}
 
 FST::~FST() {
     if (cbitsU_) delete cbitsU_;
@@ -91,6 +92,7 @@ FST::insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64
 // LOAD
 //******************************************************
 void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen) {
+    number_values = values.size();
     tree_height_ = longestKeyLen;
     vector<vector<uint8_t> > c;
     vector<vector<uint64_t> > t;
@@ -410,56 +412,56 @@ void FST::load(vector<uint64_t> &keys, vector<uint64_t> &values) {
 }
 
 //******************************************************
-// IS O BIT SET U?
+// IS O BIT SET U(pper Level)? -> dense
 //******************************************************
 inline bool FST::isCbitSetU(uint64_t nodeNum, uint8_t kc) {
     return isLabelExist(cbitsU_->bits_ + (nodeNum << 2), kc);
 }
 
 //******************************************************
-// IS O BIT SET U?
+// IS T BIT SET U? dense
 //******************************************************
 inline bool FST::isTbitSetU(uint64_t nodeNum, uint8_t kc) {
     return isLabelExist(tbitsU_->bits_ + (nodeNum << 2), kc);
 }
 
 //******************************************************
-// IS O BIT SET U?
+// IS O BIT SET U? dense
 //******************************************************
 inline bool FST::isObitSetU(uint64_t nodeNum) {
     return readBit(obitsU_->bits_[nodeNum >> 6], nodeNum & (uint64_t) 63);
 }
 
 //******************************************************
-// IS S BIT SET?
+// IS S BIT SET? sparse
 //******************************************************
 inline bool FST::isSbitSet(uint64_t pos) {
     return readBit(sbits_->bits_[pos >> 6], pos & (uint64_t) 63);
 }
 
 //******************************************************
-// IS T BIT SET?
+// IS T BIT SET? sparse
 //******************************************************
 inline bool FST::isTbitSet(uint64_t pos) {
     return readBit(tbits_->bits_[pos >> 6], pos & (uint64_t) 63);
 }
 
 //******************************************************
-// GET VALUE POS U
+// GET VALUE POS U dense
 //******************************************************
 inline uint64_t FST::valuePosU(uint64_t nodeNum, uint64_t pos) {
     return cbitsU_->rank(pos + 1) - tbitsU_->rank(pos + 1) + obitsU_->rank(nodeNum + 1) - 1;
 }
 
 //******************************************************
-// GET VALUE POS
+// GET VALUE POS sparse
 //******************************************************
 inline uint64_t FST::valuePos(uint64_t pos) {
     return pos - tbits_->rank(pos + 1);
 }
 
 //******************************************************
-// CHILD NODE NUM
+// CHILD NODE NUM dense
 //******************************************************
 inline uint64_t FST::childNodeNumU(uint64_t pos) {
     return tbitsU_->rank(pos + 1);
@@ -470,7 +472,7 @@ inline uint64_t FST::childNodeNum(uint64_t pos) {
 }
 
 //******************************************************
-// CHILD POS
+// CHILD POS sparse
 //******************************************************
 inline uint64_t FST::childpos(uint64_t nodeNum) {
     return sbits_->select(nodeNum - nodeCountU_ + 1);
@@ -533,7 +535,7 @@ inline bool FST::simdSearch(uint64_t &pos, uint64_t size, uint8_t target) {
 }
 
 //******************************************************
-// BINARY SEARCH does not work :( so sad
+// BINARY SEARCH
 //******************************************************
 inline bool FST::binarySearch(uint64_t &pos, uint64_t size, uint8_t target) {
     uint64_t l = pos;
@@ -624,7 +626,6 @@ inline bool FST::nodeSearch_lowerBound(uint64_t &pos, int size, uint8_t target) 
 // LOOKUP
 //******************************************************
 
-//Todo: no need for first one?
 uint8_t level_masks[4] = {0xFC, 0xF0, 0xC0, 0x00};
 uint8_t level_masks_last_flag[4] = {0x02, 0x08, 0x20, 0x80};
 
@@ -660,6 +661,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
                     // && !isTbitSet(pos)
 
                     kc = modified_kc;
+                    //Todo: this would also change the node? not good!
                     pos = (nodeNum << 8) + kc;
                     break;
                 }
@@ -723,6 +725,8 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
             // in this case the last one is not the last flag but a legal 1
             if (!isTbitSet(pos)) {
                 //todo careful - we read out of bitvector here
+                uint64_t value_index = valuePos(pos);
+                assert(value_index < number_values);
                 value = values_[valuePos(pos)];
                 return true;
             }
@@ -731,6 +735,8 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
         if (!isTbitSet(pos)) {
             //todo careful - we read out of bitvector here
+            uint64_t value_index = valuePos(pos);
+            assert(value_index < number_values);
             value = values_[valuePos(pos)];
             return true;
         }
@@ -745,7 +751,9 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
     //TODO: this is the important part -> here we detect that , added by @Christoph
     if (!isTbitSet(pos)) {
-        value = values_[valuePos(pos)];
+        uint64_t value_index = valuePos(pos);
+        assert(value_index < number_values);
+        value = values_[value_index];
         return true;
     }
     return false;
@@ -1010,107 +1018,119 @@ bool FST::lowerBound(const uint64_t key, FSTIter &iter) {
 //******************************************************
 // PRINT
 //******************************************************
-void FST::printU() {
-    cout << "\n======================================================\n\n";
-    for (int i = 0; i < c_lenU_; i += 4) {
-        for (int j = 0; j < 256; j++) {
-            if (isLabelExist(cbitsU_->bits_ + i, (uint8_t) j))
-                cout << (char) j;
-        }
-        cout << " || ";
-    }
-
-    cout << "\n======================================================\n\n";
-    for (int i = 0; i < c_lenU_; i += 4) {
-        for (int j = 0; j < 256; j++) {
-            if (isLabelExist(tbitsU_->bits_ + i, (uint8_t) j))
-                cout << (char) j;
-            //cout << j << " ";
-        }
-        cout << " || ";
-    }
-
-    cout << "\n======================================================\n\n";
-    for (int i = 0; i < o_lenU_; i++) {
-        if (readBit(obitsU_->bits_[i / 64], i % 64))
-            cout << "1";
-        else
-            cout << "0";
-    }
-
-    cout << "\n======================================================\n\n";
-    for (int i = 0; i < val_memU_ / 8; i++) {
-        cout << valuesU_[i] << " ";
-    }
-    cout << "\n";
-}
 
 void FST::print_csv() {
-    int c_pos = 0;
-    int v_pos = 0;
-    int s_pos = 0;
-    int value_pos = 0;
+    auto resultU = printU();
+    auto resultL = printL();
 
-    cout << "\n======================C-BYTES================================\n\n";
+    std::ofstream out_file;
+    std::string out_file_name = "out/fst.csv";
+    out_file.open(out_file_name, std::ios::out | std::ios::app);
 
-    for (int i = 0; i < c_mem_; i++)
-        cout << +cbytes_[i] << ",";
-
-    cout << "\n======================T-BITS================================\n\n";
-    for (int i = 0; i < c_mem_; i++) {
-        if (readBit(tbits_->getBits()[i / 64], i % 64))
-            cout << "1,";
-        else
-            cout << "0,";
+    auto upper_nodes_number(0);
+    for (int i = 0; i < resultU[2].size(); i++) {
+        if (resultU[2][i] == "1") {
+            upper_nodes_number++;
+        }
     }
+    out_file << upper_nodes_number << std::endl;
 
-    cout << "\n=====================S-BITS=================================\n\n";
-    for (int i = 0; i < c_mem_; i++) {
-        if (readBit(sbits_->getBits()[i / 64], i % 64))
-            cout << "1,";
-        else
-            cout << "0,";
-    }
 
-    cout << "\n=====================VALUES=================================\n\n";
-    for (int i = 0; i < val_mem_ / 8; i++) {
-        cout << values_[i] << ",";
+    for (auto i = 0; i < 4; i++) {
+        for (int k = 0; k < resultU[i].size(); k++) {
+            out_file << resultU[i][k] << ",";
+        }
+        for (int k = 0; k < resultL[i].size() - 1; k++) {
+            out_file << resultL[i][k] << ",";
+        }
+        out_file << resultL[i][resultL[i].size() - 1] << std::endl;
     }
-    cout << "\n";
+    out_file.close();
 }
 
-void FST::print() {
+std::vector<std::vector<std::string>> FST::printU() {
+
+    std::vector<std::string> c_bytes;
+    std::vector<std::string> t_bits;
+    std::vector<std::string> s_bits;
+    std::vector<std::string> values;
+
+    for (int i = 0; i < c_lenU_; i += 4) {
+        bool first_entry = true;
+
+        for (int j = 0; j < 256; j++) {
+            if (isLabelExist(cbitsU_->bits_ + i, (uint8_t) j)) {
+                c_bytes.emplace_back(std::to_string((char) j));
+                if (first_entry) {
+                    s_bits.emplace_back("1");
+                    first_entry = false;
+                } else {
+                    s_bits.emplace_back("0");
+                }
+            }
+
+        }
+    }
+
+
+    for (int i = 0; i < c_lenU_; i += 4) {
+        for (int j = 0; j < 256; j++) {
+            if (isLabelExist(tbitsU_->bits_ + i, (uint8_t) j)) {
+                t_bits.emplace_back("1");
+            } else {
+                if (isLabelExist(cbitsU_->bits_ + i, (uint8_t) j)) {
+                    t_bits.emplace_back("0");
+                }
+            }
+
+        }
+
+    }
+    assert(t_bits.size() == s_bits.size() && s_bits.size() == c_bytes.size());
+    for (int i = 0; i < val_memU_ / 8; i++) {
+        values.emplace_back(std::to_string(valuesU_[i]));
+    }
+
+    std::vector<std::vector<std::string>> result = {c_bytes, t_bits, s_bits, values};
+    return result;
+}
+
+std::vector<std::vector<std::string>> FST::printL() {
+    std::vector<std::string> c_bytes;
+    std::vector<std::string> t_bits;
+    std::vector<std::string> s_bits;
+    std::vector<std::string> values;
+
     int c_pos = 0;
     int v_pos = 0;
     int s_pos = 0;
     int value_pos = 0;
 
-    cout << "\n======================C-BYTES================================\n\n";
-
     for (int i = 0; i < c_mem_; i++)
-        cout << "(" << i << ")" << +cbytes_[i] << " ";
+        c_bytes.emplace_back(std::to_string(cbytes_[i]));
 
-    cout << "\n======================T-BITS================================\n\n";
     for (int i = 0; i < c_mem_; i++) {
         if (readBit(tbits_->getBits()[i / 64], i % 64))
-            cout << "(" << i << ")" << "1 ";
+            t_bits.emplace_back("1");
         else
-            cout << "(" << i << ")" << "0 ";
+            t_bits.emplace_back("0");
     }
 
-    cout << "\n=====================S-BITS=================================\n\n";
+
     for (int i = 0; i < c_mem_; i++) {
         if (readBit(sbits_->getBits()[i / 64], i % 64))
-            cout << "(" << i << ")" << "1 ";
+            s_bits.emplace_back("1");
         else
-            cout << "(" << i << ")" << "0 ";
+            s_bits.emplace_back("0");
     }
 
-    cout << "\n=====================VALUES=================================\n\n";
+    assert(t_bits.size() == s_bits.size() && s_bits.size() == c_bytes.size());
+
     for (int i = 0; i < val_mem_ / 8; i++) {
-        cout << "(" << i << ")" << values_[i] << " ";
+        values.emplace_back(std::to_string(values_[i]));
     }
-    cout << "\n";
+    std::vector<std::vector<std::string>> result = {c_bytes, t_bits, s_bits, values};
+    return result;
 }
 
 

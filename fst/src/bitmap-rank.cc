@@ -28,35 +28,45 @@ Modified by Huanchen Zhang
 
 #include <iostream>
 
-BitmapRankPoppy::BitmapRankPoppy(uint64_t *bits, uint32_t nbits)
-{
+// used for the LOWER level (sparse) of FST
+BitmapRankPoppy::BitmapRankPoppy(uint64_t *bits, uint32_t nbits) {
     bits_ = bits;
-    nbits_ = nbits;    
+    auto bit_length_64 = nbits % 64 == 0 ? nbits / 64 : nbits / 64 + 1;
+    bitsVector.resize(bit_length_64);
+    std::copy(bits, bits + bit_length_64, bitsVector.begin());
+    nbits_ = nbits;
     basicBlockCount_ = nbits_ / kBasicBlockSize;
     rankLUT_ = new uint32_t[basicBlockCount_];
+    rankLUTVector.resize(basicBlockCount_);
+
     assert(posix_memalign((void **) &rankLUT_, kCacheLineSize, basicBlockCount_ * sizeof(uint32_t)) >= 0);
 
     uint32_t rankCum = 0;
     for (uint32_t i = 0; i < basicBlockCount_; i++) {
-	rankLUT_[i] = rankCum;
-	rankCum += popcountLinear(bits_, 
-				  i * kWordCountPerBasicBlock, 
-				  kBasicBlockSize);
+        rankLUT_[i] = rankCum;
+        rankLUTVector[i] = rankCum;
+        rankCum += popcountLinear(bits_,
+                                  i * kWordCountPerBasicBlock,
+                                  kBasicBlockSize);
     }
-    rankLUT_[basicBlockCount_-1] = rankCum;
+    //TODO - Christoph changed this part
+    //rankLUT_[basicBlockCount_ - 1] = rankCum;
+    //rankLUTVector[basicBlockCount_ - 1] = rankCum;
 
     pCount_ = rankCum;
     mem_ = nbits / 8 + basicBlockCount_ * sizeof(uint32_t);
 }
 
-uint32_t BitmapRankPoppy::rank(uint32_t pos)
-{
+uint32_t BitmapRankPoppy::rank(uint32_t pos) {
     assert(pos <= nbits_);
-    uint32_t blockId = pos >> kBasicBlockBits;
+    uint32_t blockId = pos >> kBasicBlockBits;// == pos / 2^9 == pos / 512
+    // which superblock? -> blockid << 3 == blockid * 8
+    // which position within superblock? -> pos & 511 = 00000001|11111111_2
     return rankLUT_[blockId] + popcountLinear(bits_, (blockId << 3), (pos & 511));
+    // 511_10 = 111111111_2
 }
 
-uint64_t* BitmapRankPoppy::getBits() {
+uint64_t *BitmapRankPoppy::getBits() {
     return bits_;
 }
 

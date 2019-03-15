@@ -28,6 +28,7 @@ Modified by Huanchen Zhang
 
 #include <iostream>
 
+// used for the UPPER Levels of FST
 BitmapRankFPoppy::BitmapRankFPoppy(uint64_t *bits, uint32_t nbits)
 {
     bits_ = bits;

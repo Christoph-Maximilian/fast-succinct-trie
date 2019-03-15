@@ -19,7 +19,7 @@ class FST;
 class FST {
 public:
     static const uint8_t TERM = 36; //$
-    static const int CUTOFF_RATIO = 100000; //;64
+    static const int CUTOFF_RATIO = 100000000; //;64
 
     FST();
     virtual ~FST();
@@ -46,13 +46,13 @@ public:
     uint32_t sMem();
     uint64_t keyMem();
     uint64_t valueMem();
-
+    uint64_t number_values;
     uint64_t mem();
 
     uint32_t numT();
 
-    void printU();
-    void print();
+    std::vector<std::vector<std::string>> printU();
+    std::vector<std::vector<std::string>> printL();
     void print_csv();
 
 private:

@@ -29,7 +29,7 @@ Modified by Huanchen Zhang
 #include <string.h>
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
-
+#include <vector>
 #include "shared.h"
 
 class BitmapRank {
@@ -64,10 +64,12 @@ public:
     
 private:
     uint64_t* bits_;
+    std::vector<uint64_t > bitsVector;
     uint32_t  nbits_;
     uint32_t  mem_;
 
     uint32_t* rankLUT_;
+    std::vector<uint32_t > rankLUTVector;
     uint32_t  basicBlockCount_;
 };
 
