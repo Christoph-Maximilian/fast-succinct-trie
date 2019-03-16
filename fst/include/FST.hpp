@@ -19,7 +19,7 @@ class FST;
 class FST {
 public:
     static const uint8_t TERM = 36; //$
-    static const int CUTOFF_RATIO = 100000000; //;64
+    static const int CUTOFF_RATIO = 1; //;64
 
     FST();
     virtual ~FST();

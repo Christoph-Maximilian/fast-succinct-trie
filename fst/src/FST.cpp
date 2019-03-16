@@ -220,8 +220,8 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
                         tU[i].push_back(0);
                     }
                     nodeCountU_++;
-
-                    if (ch == TERM)
+                    // Todo this must be wrong?! we do not use terms -> add false for testing
+                    if (ch == TERM && false)
                         oU[i].push_back(1);
                     else {
                         oU[i].push_back(0);
@@ -412,7 +412,7 @@ void FST::load(vector<uint64_t> &keys, vector<uint64_t> &values) {
 }
 
 //******************************************************
-// IS O BIT SET U(pper Level)? -> dense
+// IS C BIT SET U(pper Level)? -> dense
 //******************************************************
 inline bool FST::isCbitSetU(uint64_t nodeNum, uint8_t kc) {
     return isLabelExist(cbitsU_->bits_ + (nodeNum << 2), kc);
@@ -631,16 +631,14 @@ uint8_t level_masks_last_flag[4] = {0x02, 0x08, 0x20, 0x80};
 
 bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     int keypos = 0;
-    /*std::cout << "KEY: ";
-    for (auto i = 0; i < keylen; i++) {
-        std::cout << +key[i] << "-";
-        std::cout << std::endl;
-    }*/
 
     uint64_t nodeNum = 0;
     uint8_t kc = (uint8_t) key[keypos];
     uint64_t pos = kc;
 
+    //******************************************************
+    // SEARCH IN DENSE NODES
+    // ******************************************************
     while (keypos < keylen && keypos < cutoff_level_) {
         kc = (uint8_t) key[keypos];
         //Todo: Check if parent cell ids are in node - this pos calculation is
@@ -694,7 +692,10 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         return false;
     }
 
-    //-----------------------------------------------------------------------
+    //******************************************************
+    // SEARCH IN SPARSE NODES
+    // ******************************************************
+
     pos = (cutoff_level_ == 0) ? 0 : childpos(nodeNum);
 
     while (keypos < keylen) {
