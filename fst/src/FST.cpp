@@ -1,6 +1,7 @@
 #include <FST.hpp>
 #include <bitset>
 #include <fstream>
+#include <sstream>
 
 FST::FST() : cutoff_level_(0), nodeCountU_(0), childCountU_(0),
              cbitsU_(NULL), tbitsU_(NULL), obitsU_(NULL), valuesU_(NULL),
@@ -86,6 +87,30 @@ FST::insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64
         s.push_back(0);
     }
     return true;
+}
+
+//******************************************************
+// STATISTICS
+//******************************************************
+
+std::string FST::export_stats() {
+    std::stringstream stream;
+    stream << "mem = " << this->mem() << std::endl;
+
+    // DENSE NODES
+    stream << "cMemU = " << this->cMemU() << std::endl;
+    stream << "tMemU = " << this->tMemU() << std::endl;
+    stream << "oMemU = " << this->oMemU() << std::endl;
+    stream << "keyMemU = " << this->keyMemU() << std::endl;
+    stream << "valueMemU = " << this->valueMemU() << std::endl;
+
+    // SPARSE NODES
+    stream << "cMem = " << this->cMem() << std::endl;
+    stream << "tMem = " << this->tMem() << std::endl;
+    stream << "sMem = " << this->sMem() << std::endl;
+    stream << "keyMem = " << this->keyMem() << std::endl;
+    stream << "valueMem = " << this->valueMem() << std::endl;
+    return stream.str();
 }
 
 //******************************************************
@@ -538,9 +563,9 @@ inline bool FST::simdSearch(uint64_t &pos, uint64_t size, uint8_t target) {
 // BINARY SEARCH
 //******************************************************
 inline bool FST::binarySearch(uint64_t &pos, uint64_t size, uint8_t target) {
-    uint64_t l = pos;
-    uint64_t r = pos + size - 1;
-    uint64_t m = (l + r) >> 1;
+    int64_t l = pos;
+    int64_t r = pos + size - 1;
+    int64_t m = (l + r) >> 1;
 
     while (l <= r) {
         if (cbytes_[m] == target) {
@@ -556,10 +581,10 @@ inline bool FST::binarySearch(uint64_t &pos, uint64_t size, uint8_t target) {
 }
 
 inline bool FST::binarySearch_lowerBound(uint64_t &pos, uint64_t size, uint8_t target) {
-    uint64_t rightBound = pos + size;
-    uint64_t l = pos;
-    uint64_t r = pos + size - 1;
-    uint64_t m = (l + r) >> 1;
+    int64_t rightBound = pos + size;
+    int64_t l = pos;
+    int64_t r = pos + size - 1;
+    int64_t m = (l + r) >> 1;
 
     while (l < r) {
         if (cbytes_[m] == target) {
@@ -606,7 +631,7 @@ inline bool FST::linearSearch_lowerBound(uint64_t &pos, uint64_t size, uint8_t t
 //******************************************************
 inline bool FST::nodeSearch(uint64_t &pos, int size, uint8_t target) {
     //Todo: Fix the binary search algorithm
-    if (size < 5000)
+    if (size < 7)
         return linearSearch(pos, size, target);
     else if (size < 12)
         return binarySearch(pos, size, target);
