@@ -63,9 +63,11 @@ private:
 
     inline bool isCbitSetU(uint64_t nodeNum, uint8_t kc);
     inline bool isTbitSetU(uint64_t nodeNum, uint8_t kc);
+    inline bool isEbitSetU(uint64_t nodeNum, uint8_t kc);
     inline bool isObitSetU(uint64_t nodeNum);
     inline bool isSbitSet(uint64_t pos);
     inline bool isTbitSet(uint64_t pos);
+    inline bool isEbitSet(uint64_t pos);
     inline uint64_t valuePosU(uint64_t nodeNum, uint64_t pos);
     inline uint64_t valuePos(uint64_t pos);
 

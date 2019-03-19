@@ -525,6 +525,13 @@ inline bool FST::isTbitSetU(uint64_t nodeNum, uint8_t kc) {
 }
 
 //******************************************************
+// IS E BIT SET U? dense
+//******************************************************
+inline bool FST::isEbitSetU(uint64_t nodeNum, uint8_t kc) {
+    return isLabelExist(ebitsU_ + (nodeNum << 2), kc);
+}
+
+//******************************************************
 // IS O BIT SET U? dense
 //******************************************************
 inline bool FST::isObitSetU(uint64_t nodeNum) {
@@ -543,6 +550,13 @@ inline bool FST::isSbitSet(uint64_t pos) {
 //******************************************************
 inline bool FST::isTbitSet(uint64_t pos) {
     return readBit(tbits_->bits_[pos >> 6], pos & (uint64_t) 63);
+}
+
+//******************************************************
+// IS E BIT SET? sparse
+//******************************************************
+inline bool FST::isEbitSet(uint64_t pos) {
+    return readBit(ebits_[pos >> 6], pos & (uint64_t) 63);
 }
 
 //******************************************************
@@ -749,9 +763,9 @@ bool FST::lookup(const uint8_t *key, const uint8_t keylen, uint64_t &value) {
         if (!isCbitSetU(nodeNum, kc)) { //does it have a child
             // this key does not have a child - check if a parent polygon is present in this node
             bool parent_cell_candidate_found = false;
-            for (auto i = 0; i < 4; i++) {
+            for (auto i = 0; i < 3; i++) {
                 auto modified_kc = (kc & level_masks[i]) | level_masks_last_flag[i];
-                if (isCbitSetU(nodeNum, modified_kc)) {
+                if (isCbitSetU(nodeNum, modified_kc) && !isEbitSetU(nodeNum, modified_kc)) {
                     parent_cell_candidate_found = true;
                     //TODO: do we need a check here if T bit is set?
                     // && !isTbitSet(pos)
@@ -808,10 +822,10 @@ bool FST::lookup(const uint8_t *key, const uint8_t keylen, uint64_t &value) {
             // TODO: we did not find the exact key, but how about parent S2 Cells??
             // TODO: check for parent S2 Cells
             bool parent_cell_candidate_found = false;
-            for (auto i = 0; i < 4; i++) {
+            for (auto i = 0; i < 3; i++) {
                 auto modified_kc = (kc & level_masks[i]) | level_masks_last_flag[i];
                 pos = pos_tmp;
-                if (nodeSearch(pos, nsize, modified_kc) && !isTbitSet(pos)) {
+                if (nodeSearch(pos, nsize, modified_kc) && !isTbitSet(pos) && !isEbitSet(pos)) {
                     //TOdo CHECK if T Bit is not set?!
                     // important -> found S2-parent must not go on in next child
                     // otherwise the last 1 is no in this node
