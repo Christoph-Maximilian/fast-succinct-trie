@@ -19,15 +19,15 @@ class FST;
 class FST {
 public:
     static const uint8_t TERM = 36; //$
-    static const int CUTOFF_RATIO = 64; //;64
+    static const int CUTOFF_RATIO = 5; //64
 
     FST();
     virtual ~FST();
 
-    void load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen);
+    void load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen, vector<bool>& e_bits);
     void load(vector<uint64_t> &keys, vector<uint64_t> &values);
 
-    bool lookup(const uint8_t* key, const int keylen, uint64_t &value);
+    bool lookup(const uint8_t* key, const uint8_t keylen, uint64_t &value);
     bool lookup(const uint64_t key, uint64_t &value);
 
     bool lowerBound(const uint8_t* key, const int keylen, FSTIter &iter);
@@ -58,8 +58,8 @@ public:
     void print_csv();
 
 private:
-    inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, int &pos, int &nc);
-    inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, int &pos, int &nc);
+    inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, vector<uint64_t> &e, int &pos, int &nc, bool set_e_bit);
+    inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, vector<uint64_t> &e, int &pos, int &nc, bool set_e_bit);
 
     inline bool isCbitSetU(uint64_t nodeNum, uint8_t kc);
     inline bool isTbitSetU(uint64_t nodeNum, uint8_t kc);
@@ -97,12 +97,14 @@ private:
 
     BitmapRankFPoppy* cbitsU_;
     BitmapRankFPoppy* tbitsU_;
+    uint64_t * ebitsU_;
     BitmapRankFPoppy* obitsU_;
     uint64_t* valuesU_;
 
     uint8_t* cbytes_;
     BitmapRankPoppy* tbits_;
     BitmapSelectPoppy* sbits_;
+    uint64_t * ebits_;
     uint64_t* values_;
 
     //stats
@@ -119,6 +121,7 @@ private:
 
     uint64_t c_mem_;
     uint32_t t_mem_;
+    uint32_t e_mem_;
     uint32_t s_mem_;
     uint64_t val_mem_;
 
