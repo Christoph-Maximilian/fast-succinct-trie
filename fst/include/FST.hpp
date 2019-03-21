@@ -21,7 +21,7 @@ public:
     static const uint8_t TERM = 36; //$
     static const int CUTOFF_RATIO = 5; //64
 
-    FST();
+    FST(int cutoff_level);
     virtual ~FST();
 
     void load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen, vector<bool>& e_bits);
@@ -50,6 +50,7 @@ public:
     uint64_t valueMem();
     uint64_t number_values;
     uint64_t mem();
+    uint64_t memEBits();
 
     uint32_t numT();
 

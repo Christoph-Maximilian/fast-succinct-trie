@@ -3,22 +3,24 @@
 #include <fstream>
 #include <sstream>
 
-FST::FST() : cutoff_level_(0), nodeCountU_(0), childCountU_(0),
-             cbitsU_(NULL), tbitsU_(NULL), obitsU_(NULL), valuesU_(NULL),
-             cbytes_(NULL), tbits_(NULL), sbits_(NULL), values_(NULL),
-             tree_height_(0), last_value_pos_(0),
-             c_lenU_(0), o_lenU_(0), c_memU_(0), t_memU_(0), o_memU_(0), val_memU_(0),
-             c_mem_(0), t_mem_(0), s_mem_(0), val_mem_(0), num_t_(0), number_values(0) {}
+FST::FST(int cutoff_level) : cutoff_level_(cutoff_level), nodeCountU_(0), childCountU_(0),
+                             cbitsU_(NULL), tbitsU_(NULL), obitsU_(NULL), valuesU_(NULL),
+                             cbytes_(NULL), tbits_(NULL), sbits_(NULL), values_(NULL),
+                             tree_height_(0), last_value_pos_(0),
+                             c_lenU_(0), o_lenU_(0), c_memU_(0), t_memU_(0), o_memU_(0), val_memU_(0),
+                             c_mem_(0), t_mem_(0), s_mem_(0), val_mem_(0), num_t_(0), number_values(0) {}
 
 FST::~FST() {
     if (cbitsU_) delete cbitsU_;
     if (tbitsU_) delete tbitsU_;
     if (obitsU_) delete obitsU_;
+    if (ebitsU_) delete ebitsU_;
     if (valuesU_) delete valuesU_;
 
     if (cbytes_) delete cbytes_;
     if (tbits_) delete tbits_;
     if (sbits_) delete sbits_;
+    if (ebits_) delete ebits_;
     if (values_) delete values_;
 }
 
@@ -42,8 +44,8 @@ uint32_t FST::sMem() { return s_mem_; }
 uint64_t FST::keyMem() { return (c_mem_ + t_mem_ + s_mem_); }
 
 uint64_t FST::valueMem() { return val_mem_; }
-
-uint64_t FST::mem() { return (c_memU_ + t_memU_ + o_memU_ + val_memU_ + c_mem_ + t_mem_ + s_mem_ + val_mem_); }
+uint64_t FST::memEBits() { return (c_lenU_ * 8) + (e_mem_ * 8); }
+uint64_t FST::mem() { return (c_memU_ + t_memU_ + (c_lenU_ * 8) + o_memU_ + val_memU_ + c_mem_ + t_mem_ + s_mem_ + (e_mem_ * 8) + val_mem_); }
 
 uint32_t FST::numT() { return num_t_; }
 
@@ -217,12 +219,14 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
     for (int i = 0; i < (int) nc.size(); i++)
         nc_total += nc[i];
 
+    /*
     int nc_u = 0;
     while (nc_u * CUTOFF_RATIO < nc_total) {
         nc_u += nc[cutoff_level_];
         cutoff_level_++;
     }
     cutoff_level_--;
+    */
 
     cout << "cutoff_level_ = " << cutoff_level_ << "\n";
 
