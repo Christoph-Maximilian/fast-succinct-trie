@@ -39,6 +39,7 @@ public:
 
     uint32_t cMemU();
     uint32_t tMemU();
+    uint32_t eMemU();
     uint32_t oMemU();
     uint32_t keyMemU();
     uint32_t valueMemU();
@@ -46,6 +47,7 @@ public:
     uint64_t cMem();
     uint32_t tMem();
     uint32_t sMem();
+    uint32_t eMem();
     uint64_t keyMem();
     uint64_t valueMem();
     uint64_t number_values;

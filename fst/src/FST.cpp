@@ -29,6 +29,8 @@ uint32_t FST::cMemU() { return c_memU_; }
 
 uint32_t FST::tMemU() { return t_memU_; }
 
+uint32_t FST::eMemU() { return (c_lenU_ * 8); }
+
 uint32_t FST::oMemU() { return o_memU_; }
 
 uint32_t FST::keyMemU() { return (c_memU_ + t_memU_ + o_memU_); }
@@ -43,9 +45,13 @@ uint32_t FST::sMem() { return s_mem_; }
 
 uint64_t FST::keyMem() { return (c_mem_ + t_mem_ + s_mem_); }
 
+uint32_t FST::eMem() { return (e_mem_ * 8); }
+
 uint64_t FST::valueMem() { return val_mem_; }
+
 uint64_t FST::memEBits() { return (c_lenU_ * 8) + (e_mem_ * 8); }
-uint64_t FST::mem() { return (c_memU_ + t_memU_ + (c_lenU_ * 8) + o_memU_ + val_memU_ + c_mem_ + t_mem_ + s_mem_ + (e_mem_ * 8) + val_mem_); }
+
+uint64_t FST::mem() { return (c_memU_ + t_memU_ + this->eMemU() + o_memU_ + val_memU_ + c_mem_ + t_mem_ + s_mem_ + this->eMem() + val_mem_); }
 
 uint32_t FST::numT() { return num_t_; }
 

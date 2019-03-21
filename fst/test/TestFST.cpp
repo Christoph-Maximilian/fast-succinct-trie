@@ -158,7 +158,7 @@ TEST_F(UnitTest, ScanTest) {
     vector<uint64_t> values;
     int longestKeyLen = loadFile(testFilePath, keys, values);
 
-    FST *index = new FST();
+    FST *index = new FST(2);
     index->load(keys, values, longestKeyLen);
 
     printStatFST(index);
