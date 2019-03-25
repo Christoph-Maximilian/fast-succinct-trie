@@ -21,7 +21,7 @@ public:
     static const uint8_t TERM = 36; //$
     static const int CUTOFF_RATIO = 64; //;64
 
-    FST();
+    FST(int cutoff_level);
     virtual ~FST();
 
     void load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen);

@@ -3,7 +3,7 @@
 #include <fstream>
 #include <sstream>
 
-FST::FST() : cutoff_level_(0), nodeCountU_(0), childCountU_(0),
+FST::FST(int cutoff_level) : cutoff_level_(cutoff_level), nodeCountU_(0), childCountU_(0),
              cbitsU_(NULL), tbitsU_(NULL), obitsU_(NULL), valuesU_(NULL),
              cbytes_(NULL), tbits_(NULL), sbits_(NULL), values_(NULL),
              tree_height_(0), last_value_pos_(0),
@@ -195,12 +195,14 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
     for (int i = 0; i < (int) nc.size(); i++)
         nc_total += nc[i];
 
+    /*
     int nc_u = 0;
     while (nc_u * CUTOFF_RATIO < nc_total) {
         nc_u += nc[cutoff_level_];
         cutoff_level_++;
     }
     cutoff_level_--;
+    */
 
     cout << "cutoff_level_ = " << cutoff_level_ << "\n";
 
