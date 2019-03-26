@@ -4,22 +4,22 @@
 #include <sstream>
 
 FST::FST(int cutoff_level) : cutoff_level_(cutoff_level), nodeCountU_(0), childCountU_(0),
-             cbitsU_(NULL), tbitsU_(NULL), obitsU_(NULL), valuesU_(NULL),
-             cbytes_(NULL), tbits_(NULL), sbits_(NULL), values_(NULL),
-             tree_height_(0), last_value_pos_(0),
-             c_lenU_(0), o_lenU_(0), c_memU_(0), t_memU_(0), o_memU_(0), val_memU_(0),
-             c_mem_(0), t_mem_(0), s_mem_(0), val_mem_(0), num_t_(0), number_values(0) {}
+                             cbitsU_(nullptr), tbitsU_(nullptr), obitsU_(nullptr), valuesU_(nullptr),
+                             cbytes_(nullptr), tbits_(nullptr), sbits_(nullptr), values_(nullptr),
+                             tree_height_(0), last_value_pos_(0),
+                             c_lenU_(0), o_lenU_(0), c_memU_(0), t_memU_(0), o_memU_(0), val_memU_(0),
+                             c_mem_(0), t_mem_(0), s_mem_(0), val_mem_(0), num_t_(0), number_values(0) {}
 
 FST::~FST() {
-    if (cbitsU_) delete cbitsU_;
-    if (tbitsU_) delete tbitsU_;
-    if (obitsU_) delete obitsU_;
-    if (valuesU_) delete valuesU_;
+    delete cbitsU_;
+    delete tbitsU_;
+    delete obitsU_;
+    delete valuesU_;
 
-    if (cbytes_) delete cbytes_;
-    if (tbits_) delete tbits_;
-    if (sbits_) delete sbits_;
-    if (values_) delete values_;
+    delete cbytes_;
+    delete tbits_;
+    delete sbits_;
+    delete values_;
 }
 
 //stat
@@ -50,8 +50,8 @@ uint32_t FST::numT() { return num_t_; }
 
 //*******************************************************************
 inline bool
-FST::insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, int &pos,
-                     int &nc) {
+FST::insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos,
+                     uint32_t &nc) {
     if (c.empty() || c.back() != ch) {
         c.push_back(ch);
         if (c.size() == 1) {
@@ -74,8 +74,9 @@ FST::insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, 
 }
 
 inline bool
-FST::insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, int &pos,
-                int &nc) {
+FST::insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s,
+                uint32_t &pos,
+                uint32_t &nc) {
     c.push_back(ch);
     if (!isTerm)
         setBit(t.back(), pos % 64);
@@ -116,16 +117,17 @@ std::string FST::export_stats() {
 //******************************************************
 // LOAD
 //******************************************************
-void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen) {
-    number_values = values.size();
-    tree_height_ = longestKeyLen;
+void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLen) {
+    // TODO number_values = values.size();
+    tree_height_ = static_cast<uint32_t >(longestKeyLen);
     vector<vector<uint8_t> > c;
     vector<vector<uint64_t> > t;
     vector<vector<uint64_t> > s;
     vector<vector<uint64_t> > val;
+    vector<uint64_t> keys_per_level;
 
-    vector<int> pos_list;
-    vector<int> nc; //node count
+    vector<uint32_t> pos_list;
+    vector<uint32_t> nc; //node count
 
     // init
     for (int i = 0; i < longestKeyLen; i++) {
@@ -133,6 +135,7 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
         t.push_back(vector<uint64_t>());
         s.push_back(vector<uint64_t>());
         val.push_back(vector<uint64_t>());
+        keys_per_level.push_back(0);
 
         pos_list.push_back(0);
         nc.push_back(0);
@@ -142,46 +145,50 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
     }
 
     int last_value_level = 0;
-    for (int k = 0; k < (int) keys.size(); k++) {
-        string key = keys[k];
-        uint64_t value = values[k];
+    int value_pos = 0;
+    for (int k = 0; k < (int) keys.size();) {
+        number_values++;
+        int length = keys[k];
+        k++;
 
-        // if same key
-        if (k < (int) (keys.size() - 1) && key.compare(keys[k + 1]) == 0)
-            continue;
+        uint8_t *key = &(keys[k]);
+        k += length;
+        uint64_t value = values[value_pos];
+        value_pos++;
+
 
         int i = 0;
-        while (i < key.length() && !insertChar_cond((uint8_t) key[i], c[i], t[i], s[i], pos_list[i], nc[i])) {
+        while (i < length && !insertChar_cond((uint8_t) key[i], c[i], t[i], s[i], pos_list[i], nc[i])) {
             //insertChar_cond((uint8_t)key[i], c[i], t[i], s[i], pos_list[i], nc[i]);
             i++;
         }
 
 
-        if (i < key.length()) {
-            if (k + 1 < (int) keys.size() or true) {
-                int cpl = key.length(); //commonPrefixLen(key, keys[k + 1]);
-                if (i < (cpl - 1)) {
-                    // There will be a child node -> set T bit of corresponding position within node
-                    if (pos_list[i] % 64 == 0)
-                        setBit(t[i].rbegin()[1], 63);
-                    else
-                        setBit(t[i].back(), (pos_list[i] - 1) % 64);
-                }
+        if (i < length) {
 
-                while (i < (cpl - 1)) {
-                    i++;
-                    if (i < (cpl - 1))
-                        insertChar((uint8_t) key[i], false, c[i], t[i], s[i], pos_list[i], nc[i]);
-                    else {
-                        //if (i < key.length())
-                        insertChar((uint8_t) key[i], true, c[i], t[i], s[i], pos_list[i], nc[i]);
-                        /*else {
-                            insertChar(TERM, true, c[i], t[i], s[i], pos_list[i], nc[i]);
-                            num_t_++; //stat number terms
-                        }*/
-                    }
+            int cpl = length; //commonPrefixLen(key, keys[k + 1]);
+            if (i < (cpl - 1)) {
+                // There will be a child node -> set T bit of corresponding position within node
+                if (pos_list[i] % 64 == 0)
+                    setBit(t[i].rbegin()[1], 63);
+                else
+                    setBit(t[i].back(), (pos_list[i] - 1) % 64);
+            }
+
+            while (i < (cpl - 1)) {
+                i++;
+                if (i < (cpl - 1))
+                    insertChar((uint8_t) key[i], false, c[i], t[i], s[i], pos_list[i], nc[i]);
+                else {
+                    //if (i < key.length())
+                    insertChar((uint8_t) key[i], true, c[i], t[i], s[i], pos_list[i], nc[i]);
+                    /*else {
+                        insertChar(TERM, true, c[i], t[i], s[i], pos_list[i], nc[i]);
+                        num_t_++; //stat number terms
+                    }*/
                 }
             }
+
             val[i].push_back(value);
         } else
             cout << "ERROR!\n";
@@ -194,15 +201,6 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
     int nc_total = 0;
     for (int i = 0; i < (int) nc.size(); i++)
         nc_total += nc[i];
-
-    /*
-    int nc_u = 0;
-    while (nc_u * CUTOFF_RATIO < nc_total) {
-        nc_u += nc[cutoff_level_];
-        cutoff_level_++;
-    }
-    cutoff_level_--;
-    */
 
     cout << "cutoff_level_ = " << cutoff_level_ << "\n";
 
@@ -233,8 +231,8 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
         uint64_t smaxPos_i = pos_list[i];
 
         uint8_t ch = 0;
-        int j = 0;
-        int k = 0;
+        uint32_t j = 0;
+        uint32_t k = 0;
         for (j = 0; j < (int) s[i].size(); j++) {
             if (sbitPos_i >= smaxPos_i) break;
             for (k = 0; k < 64; k++) {
@@ -271,7 +269,7 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
     }
 
     o_lenU_ = 0;
-    int vallenU = 0;
+    u_int64_t vallenU = 0;
     for (int i = 0; i < (int) cU.size(); i++) {
         c_lenU_ += cU[i].size();
         o_lenU_ += oU[i].size();
@@ -292,9 +290,9 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
         obitsU[i] = 0;
 
     uint64_t c_bitPosU = 0;
-    for (int i = 0; i < (int) cU.size(); i++) {
-        for (int j = 0; j < (int) cU[i].size(); j++) {
-            for (int k = 0; k < 64; k++) {
+    for (u_int32_t i = 0; i < (u_int32_t) cU.size(); i++) {
+        for (u_int32_t j = 0; j < (u_int32_t) cU[i].size(); j++) {
+            for (u_int32_t k = 0; k < 64; k++) {
                 if (readBit(cU[i][j], k))
                     setBit(cbitsU[c_bitPosU / 64], c_bitPosU % 64);
                 c_bitPosU++;
@@ -302,14 +300,14 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
         }
     }
 
-    int c_sizeU = (c_lenU_ / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
+    u_int64_t c_sizeU = (c_lenU_ / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
     cbitsU_ = new BitmapRankFPoppy(cbitsU, c_sizeU * 64);
     c_memU_ = cbitsU_->getNbits() / 8; //stat
 
     uint64_t t_bitPosU = 0;
-    for (int i = 0; i < (int) tU.size(); i++) {
-        for (int j = 0; j < (int) tU[i].size(); j++) {
-            for (int k = 0; k < 64; k++) {
+    for (u_int32_t i = 0; i < (u_int32_t) tU.size(); i++) {
+        for (u_int32_t j = 0; j < (u_int32_t) tU[i].size(); j++) {
+            for (u_int32_t k = 0; k < 64; k++) {
                 if (readBit(tU[i][j], k))
                     setBit(tbitsU[t_bitPosU / 64], t_bitPosU % 64);
                 t_bitPosU++;
@@ -317,7 +315,7 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
         }
     }
 
-    int t_sizeU = (c_lenU_ / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
+    u_int64_t t_sizeU = (c_lenU_ / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
     tbitsU_ = new BitmapRankFPoppy(tbitsU, t_sizeU * 64);
     t_memU_ = tbitsU_->getNbits() / 8; //stat
 
@@ -330,13 +328,13 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
         }
     }
 
-    int o_sizeU = (o_lenU_ / 64 / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
+    u_int64_t o_sizeU = (o_lenU_ / 64 / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
     obitsU_ = new BitmapRankFPoppy(obitsU, o_sizeU * 64);
     o_memU_ = obitsU_->getNbits() / 8; //stat
 
     uint64_t val_posU = 0;
-    for (int i = 0; i < cutoff_level_; i++) {
-        for (int j = 0; j < (int) val[i].size(); j++) {
+    for (u_int32_t i = 0; i < cutoff_level_; i++) {
+        for (u_int32_t j = 0; j < (u_int32_t) val[i].size(); j++) {
             valuesU_[val_posU] = val[i][j];
             val_posU++;
         }
@@ -426,6 +424,12 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
         }
     }
     //-------------------------------------------------
+    //node counts per level
+    nc_ = nc;
+    for (auto i = 0; i < c.size(); i++) {
+        keys_per_level[i] = c[i].size();
+    }
+    keys_per_level_ = keys_per_level;
 }
 
 void FST::load(vector<uint64_t> &keys, vector<uint64_t> &values) {
@@ -435,7 +439,7 @@ void FST::load(vector<uint64_t> &keys, vector<uint64_t> &values) {
         reinterpret_cast<uint64_t *>(key)[0] = __builtin_bswap64(keys[i]);
         keys_str.push_back(string(key, 8));
     }
-    load(keys_str, values, sizeof(uint64_t));
+    //load(keys_str, values, sizeof(uint64_t));
 }
 
 //******************************************************
@@ -711,13 +715,13 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         keypos++;
     }
 
-    if (keypos < cutoff_level_) {
-        if (isObitSetU(nodeNum)) {
-            value = valuesU_[valuePosU(nodeNum, (nodeNum << 8))];
-            return true;
-        }
-        return false;
-    }
+    //if (keypos < cutoff_level_) {
+    //    if (isObitSetU(nodeNum)) {
+    //        value = valuesU_[valuePosU(nodeNum, (nodeNum << 8))];
+    //        return true;
+    //    }
+    //    return false;
+    //}
 
     //******************************************************
     // SEARCH IN SPARSE NODES
