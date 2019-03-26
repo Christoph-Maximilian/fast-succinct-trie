@@ -24,7 +24,7 @@ public:
     FST(int cutoff_level);
     virtual ~FST();
 
-    void load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen);
+    void load(vector<uint8_t > &keys, vector<uint64_t> &values, int longestKeyLen);
     void load(vector<uint64_t> &keys, vector<uint64_t> &values);
 
     bool lookup(const uint8_t* key, const int keylen, uint64_t &value);
@@ -51,6 +51,9 @@ public:
     uint64_t number_values;
     uint64_t mem();
 
+    vector<uint32_t > nc_;
+    vector<uint64_t > keys_per_level_;
+
     uint32_t numT();
 
     std::vector<std::vector<std::string>> printU();
@@ -58,8 +61,8 @@ public:
     void print_csv();
 
 private:
-    inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, int &pos, int &nc);
-    inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, int &pos, int &nc);
+    inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos, uint32_t &nc);
+    inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos, uint32_t &nc);
 
     inline bool isCbitSetU(uint64_t nodeNum, uint8_t kc);
     inline bool isTbitSetU(uint64_t nodeNum, uint8_t kc);
@@ -98,12 +101,18 @@ private:
     BitmapRankFPoppy* cbitsU_;
     BitmapRankFPoppy* tbitsU_;
     BitmapRankFPoppy* obitsU_;
+    BitmapRankFPoppy* vbitsU_;
+    vector<uint64_t > vbitsU_bits;
     uint64_t* valuesU_;
+    vector<uint64_t > values_U_succinct;
 
     uint8_t* cbytes_;
     BitmapRankPoppy* tbits_;
+    BitmapRankPoppy* vbits_;
     BitmapSelectPoppy* sbits_;
-    uint64_t* values_;
+    vector<uint64_t > values_;
+    vector<uint64_t > vbitsL_bits;
+    vector<uint64_t> values_L_succinct;
 
     //stats
     uint32_t tree_height_;
@@ -118,8 +127,8 @@ private:
     uint32_t val_memU_;
 
     uint64_t c_mem_;
-    uint32_t t_mem_;
-    uint32_t s_mem_;
+    uint64_t t_mem_;
+    uint64_t s_mem_;
     uint64_t val_mem_;
 
     uint32_t num_t_;
@@ -137,7 +146,7 @@ typedef struct {
 class FSTIter {
 public:
     FSTIter();
-    FSTIter(FST* idx);
+    explicit FSTIter(FST* idx);
 
     void clear ();
 
