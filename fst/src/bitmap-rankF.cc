@@ -29,7 +29,7 @@ Modified by Huanchen Zhang
 #include <iostream>
 
 // used for the UPPER Levels of FST
-BitmapRankFPoppy::BitmapRankFPoppy(uint64_t *bits, uint32_t nbits)
+BitmapRankFPoppy::BitmapRankFPoppy(uint64_t *bits, uint64_t nbits)
 {
     bits_ = bits;
     nbits_ = nbits;
@@ -50,11 +50,11 @@ BitmapRankFPoppy::BitmapRankFPoppy(uint64_t *bits, uint32_t nbits)
     mem_ = nbits / 8 + basicBlockCount_ * sizeof(uint32_t);
 }
 
-uint32_t BitmapRankFPoppy::rank(uint32_t pos)
+uint64_t BitmapRankFPoppy::rank(uint64_t pos)
 {
     assert(pos <= nbits_);
-    uint32_t blockId = pos >> kBasicBlockBits;
-    uint32_t offset = pos & (uint32_t)63;
+    uint64_t blockId = pos >> kBasicBlockBits;
+    auto offset = static_cast<uint32_t > (pos & (uint32_t)63);
     if (offset)
 	return rankLUT_[blockId] + popcount(bits_[blockId] >> (64 - offset));
     else
@@ -65,10 +65,10 @@ uint64_t* BitmapRankFPoppy::getBits() {
     return bits_;
 }
 
-uint32_t BitmapRankFPoppy::getNbits() {
+uint64_t BitmapRankFPoppy::getNbits() {
     return nbits_;
 }
 
-uint32_t BitmapRankFPoppy::getMem() {
+uint64_t BitmapRankFPoppy::getMem() {
     return mem_;
 }

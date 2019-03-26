@@ -58,8 +58,8 @@ public:
     void print_csv();
 
 private:
-    inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, int &pos, int &nc);
-    inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, int &pos, int &nc);
+    inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos, uint32_t &nc);
+    inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos, uint32_t &nc);
 
     inline bool isCbitSetU(uint64_t nodeNum, uint8_t kc);
     inline bool isTbitSetU(uint64_t nodeNum, uint8_t kc);
@@ -118,8 +118,8 @@ private:
     uint32_t val_memU_;
 
     uint64_t c_mem_;
-    uint32_t t_mem_;
-    uint32_t s_mem_;
+    uint64_t t_mem_;
+    uint64_t s_mem_;
     uint64_t val_mem_;
 
     uint32_t num_t_;
@@ -137,7 +137,7 @@ typedef struct {
 class FSTIter {
 public:
     FSTIter();
-    FSTIter(FST* idx);
+    explicit FSTIter(FST* idx);
 
     void clear ();
 

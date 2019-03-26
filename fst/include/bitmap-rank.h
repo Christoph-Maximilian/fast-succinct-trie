@@ -51,7 +51,7 @@ protected:
 class BitmapRankPoppy: public BitmapRank {
 public:
     BitmapRankPoppy(uint64_t* bits, uint32_t nbits);
-    ~BitmapRankPoppy() {}
+    ~BitmapRankPoppy() = default;
     
     uint32_t rank(uint32_t pos);
 
