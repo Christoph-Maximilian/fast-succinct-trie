@@ -676,6 +676,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         __builtin_prefetch(tbitsU_->rankLUT_ + ((pos + 1) >> 6), 0);
 
         if (!isCbitSetU(nodeNum, kc)) { //does it have a child
+            return false;
             // this key does not have a child - check if a parent polygon is present in this node
             bool parent_cell_candidate_found = false;
             for (auto i = 0; i < 4; i++) {
@@ -734,6 +735,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
         auto pos_tmp = pos;
         if (!nodeSearch(pos, nsize, kc)) {
+            return false;
             // TODO: we did not find the exact key, but how about parent S2 Cells??
             // TODO: check for parent S2 Cells
             bool parent_cell_candidate_found = false;
