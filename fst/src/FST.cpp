@@ -75,13 +75,15 @@ FST::insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, 
 
 inline bool
 FST::insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s,
-                uint32_t &pos,
-                uint32_t &nc) {
+                uint32_t &pos, uint32_t &nc, bool set_SBit) {
     c.push_back(ch);
     if (!isTerm)
         setBit(t.back(), pos % 64);
-    setBit(s.back(), pos % 64);
-    nc++;
+    if (set_SBit) {
+        setBit(s.back(), pos % 64);
+        nc++;
+    }
+
     pos++;
     if (pos % 64 == 0) {
         t.push_back(0);
@@ -89,6 +91,7 @@ FST::insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64
     }
     return true;
 }
+
 
 //******************************************************
 // STATISTICS
@@ -117,24 +120,28 @@ std::string FST::export_stats() {
 //******************************************************
 // LOAD
 //******************************************************
+uint8_t denorm_levels[4] = {1, 4, 16, 64};
+
 void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLen) {
-    // TODO number_values = values.size();
     tree_height_ = static_cast<uint32_t >(longestKeyLen);
     vector<vector<uint8_t> > c;
     vector<vector<uint64_t> > t;
     vector<vector<uint64_t> > s;
     vector<vector<uint64_t> > val;
-    vector<uint64_t> keys_per_level;
 
-    vector<uint32_t> pos_list;
-    vector<uint32_t> nc; //node count
+    vector<std::pair<vector<uint64_t>, vector<uint64_t >>> val_succ_tmp(longestKeyLen);
+    vector<uint64_t> values_count_per_level(longestKeyLen);
+
+    vector<uint64_t> keys_per_level;
+    vector<uint32_t > pos_list;
+    vector<uint32_t > nc; //node count
 
     // init
     for (int i = 0; i < longestKeyLen; i++) {
-        c.push_back(vector<uint8_t>());
-        t.push_back(vector<uint64_t>());
-        s.push_back(vector<uint64_t>());
-        val.push_back(vector<uint64_t>());
+        c.emplace_back(vector<uint8_t>());
+        t.emplace_back(vector<uint64_t>());
+        s.emplace_back(vector<uint64_t>());
+        val.emplace_back(vector<uint64_t>());
         keys_per_level.push_back(0);
 
         pos_list.push_back(0);
@@ -145,28 +152,38 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     }
 
     int last_value_level = 0;
-    int value_pos = 0;
-    for (int k = 0; k < (int) keys.size();) {
-        number_values++;
-        int length = keys[k];
-        k++;
+    uint64_t index = 0;
 
-        uint8_t *key = &(keys[k]);
-        k += length;
-        uint64_t value = values[value_pos];
-        value_pos++;
+    uint8_t key[8];
+    uint64_t value_index = std::numeric_limits<uint64_t>::max();
+    while (index < keys.size()) {
+        value_index++;
+        auto info_byte = keys[index];
+        auto number_denorm_cells = denorm_levels[info_byte >> 6];
+        auto number_common_cells = info_byte & 15;
+        auto key_size = number_common_cells + 1;
 
+        for (auto ncl = 0; ncl < number_common_cells; ncl++) {
+            index++;
+            key[ncl] = keys[index];
+        }
+
+        index++;
+        uint64_t end_index = index + static_cast<uint64_t>(number_denorm_cells);
+
+
+        // set denormalize cell at the end
+        key[number_common_cells] = keys[index];
+        uint64_t value = values[value_index];
 
         int i = 0;
-        while (i < length && !insertChar_cond((uint8_t) key[i], c[i], t[i], s[i], pos_list[i], nc[i])) {
-            //insertChar_cond((uint8_t)key[i], c[i], t[i], s[i], pos_list[i], nc[i]);
+        while (i < key_size && !insertChar_cond((uint8_t) key[i], c[i], t[i], s[i], pos_list[i], nc[i])) {
             i++;
         }
 
-
-        if (i < length) {
-
-            int cpl = length; //commonPrefixLen(key, keys[k + 1]);
+        if (i < key_size) {
+            //  todo commented out: if (k + 1 < (int) key_size) {...
+            auto cpl = static_cast<uint32_t >(key_size); //commonPrefixLen(key, keys[k + 1]);
             if (i < (cpl - 1)) {
                 // There will be a child node -> set T bit of corresponding position within node
                 if (pos_list[i] % 64 == 0)
@@ -174,27 +191,33 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
                 else
                     setBit(t[i].back(), (pos_list[i] - 1) % 64);
             }
-
+            // the first (denormalized) key MAY be inserted in insertChar
+            if (i == key_size - 1) {
+                index++;
+            }
             while (i < (cpl - 1)) {
                 i++;
                 if (i < (cpl - 1))
-                    insertChar((uint8_t) key[i], false, c[i], t[i], s[i], pos_list[i], nc[i]);
-                else {
-                    //if (i < key.length())
-                    insertChar((uint8_t) key[i], true, c[i], t[i], s[i], pos_list[i], nc[i]);
-                    /*else {
-                        insertChar(TERM, true, c[i], t[i], s[i], pos_list[i], nc[i]);
-                        num_t_++; //stat number terms
-                    }*/
-                }
+                    insertChar((uint8_t) key[i], false, c[i], t[i], s[i], pos_list[i], nc[i], true);
+            }
+            for (; index < end_index; index++) {
+                key[number_common_cells] = keys[index];
+                insertChar((uint8_t) key[i], true, c[i], t[i], s[i], pos_list[i], nc[i],
+                           end_index - index == number_denorm_cells);
             }
 
-            val[i].push_back(value);
+            // todo: save values more efficiently here
+            number_values += number_denorm_cells;
+            for (auto nv = 0; nv < number_denorm_cells; nv++) {
+                val[i].push_back(value);
+
+            }
         } else
             cout << "ERROR!\n";
 
-        if (k >= keys.size() - 1)
+        if (index >= keys.size() - 1)
             last_value_level = i;
+
     }
 
     // put together
@@ -680,6 +703,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         __builtin_prefetch(tbitsU_->rankLUT_ + ((pos + 1) >> 6), 0);
 
         if (!isCbitSetU(nodeNum, kc)) { //does it have a child
+            return false;
             // this key does not have a child - check if a parent polygon is present in this node
             bool parent_cell_candidate_found = false;
             for (auto i = 0; i < 4; i++) {
@@ -738,6 +762,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
         auto pos_tmp = pos;
         if (!nodeSearch(pos, nsize, kc)) {
+            return false;
             // TODO: we did not find the exact key, but how about parent S2 Cells??
             // TODO: check for parent S2 Cells
             bool parent_cell_candidate_found = false;
