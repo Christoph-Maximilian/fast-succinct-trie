@@ -477,6 +477,7 @@ inline bool FST::isTbitSet(uint64_t pos) {
 // GET VALUE POS U dense
 //******************************************************
 inline uint64_t FST::valuePosU(uint64_t nodeNum, uint64_t pos) {
+    //todo: last obits can be optimized out
     return cbitsU_->rank(pos + 1) - tbitsU_->rank(pos + 1) + obitsU_->rank(nodeNum + 1) - 1;
 }
 
@@ -704,7 +705,8 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         }
         if (!isTbitSetU(nodeNum, kc)) {
             //Christoph: i think this returns if the current prefix ends
-            value = valuesU_[valuePosU(nodeNum, pos)];
+            //value = valuesU_[valuePosU(nodeNum, pos)];
+            value = 0;
             return true;
         }
 
@@ -765,9 +767,10 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
         if (!isTbitSet(pos)) {
             //todo careful - we read out of bitvector here
-            uint64_t value_index = valuePos(pos);
-            assert(value_index < number_values);
-            value = values_[valuePos(pos)];
+            //uint64_t value_index = valuePos(pos);
+            //assert(value_index < number_values);
+            //value = values_[valuePos(pos)];
+            value = 0;
             return true;
         }
 
@@ -781,9 +784,10 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
     //TODO: this is the important part -> here we detect that , added by @Christoph
     if (!isTbitSet(pos)) {
-        uint64_t value_index = valuePos(pos);
-        assert(value_index < number_values);
-        value = values_[value_index];
+        //uint64_t value_index = valuePos(pos);
+        //assert(value_index < number_values);
+        //value = values_[value_index];
+        value = 0;
         return true;
     }
     return false;
