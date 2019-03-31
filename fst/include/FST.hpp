@@ -51,6 +51,8 @@ public:
     uint64_t number_values;
     uint64_t mem();
 
+    vector<uint32_t > nc_;
+    vector<uint64_t > keys_per_level_;
     uint32_t numT();
 
     std::vector<std::vector<std::string>> printU();
