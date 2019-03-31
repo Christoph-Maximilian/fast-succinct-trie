@@ -181,6 +181,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
             i++;
         }
 
+
         if (i < key_size) {
             //  todo commented out: if (k + 1 < (int) key_size) {...
             auto cpl = static_cast<uint32_t >(key_size); //commonPrefixLen(key, keys[k + 1]);
@@ -316,8 +317,9 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     for (u_int32_t i = 0; i < (u_int32_t) cU.size(); i++) {
         for (u_int32_t j = 0; j < (u_int32_t) cU[i].size(); j++) {
             for (u_int32_t k = 0; k < 64; k++) {
-                if (readBit(cU[i][j], k))
+                if (readBit(cU[i][j], k)) {
                     setBit(cbitsU[c_bitPosU / 64], c_bitPosU % 64);
+                }
                 c_bitPosU++;
             }
         }
@@ -393,6 +395,8 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         sbits[i] = 0;
     }
 
+    //todo: parallelize the following stuff
+
     uint64_t c_pos = 0;
     for (int i = cutoff_level_; i < (int) c.size(); i++) {
         for (int j = 0; j < (int) c[i].size(); j++) {
@@ -453,6 +457,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         keys_per_level[i] = c[i].size();
     }
     keys_per_level_ = keys_per_level;
+
 }
 
 void FST::load(vector<uint64_t> &keys, vector<uint64_t> &values) {
@@ -504,7 +509,7 @@ inline bool FST::isTbitSet(uint64_t pos) {
 // GET VALUE POS U dense
 //******************************************************
 inline uint64_t FST::valuePosU(uint64_t nodeNum, uint64_t pos) {
-    //todo: last obits can be optimized out
+    //todo: last obits can be optimized out ???
     return cbitsU_->rank(pos + 1) - tbitsU_->rank(pos + 1) + obitsU_->rank(nodeNum + 1) - 1;
 }
 
@@ -543,12 +548,8 @@ inline int FST::nodeSize(uint64_t pos) {
     uint64_t startIdx = pos >> 6;
     // for the shift, only the six lowest level bits are relevant
     uint64_t shift = pos & (uint64_t) 0x3F;
-    uint64_t bits = sbits_->bits_[startIdx];
-    //std::bitset<64> sbit_vector(bits);
-    //std::cout << "S-BITS: " << sbit_vector << std::endl;
-    bits = sbits_->bits_[startIdx] << shift;
-    //std::bitset<64> sbit_vector1(bits);
-    //std::cout << "S-BITS[SHIFTED] " << sbit_vector1 << std::endl;
+    uint64_t bits = sbits_->bits_[startIdx] << shift;
+
     if (bits > 0) //counting the number of leading zeros + 1 = nodesize
         return __builtin_clzll(bits) + 1;
 
@@ -680,15 +681,11 @@ inline bool FST::nodeSearch_lowerBound(uint64_t &pos, int size, uint8_t target) 
 //******************************************************
 // LOOKUP
 //******************************************************
-
-uint8_t level_masks[4] = {0xFC, 0xF0, 0xC0, 0x00};
-uint8_t level_masks_last_flag[4] = {0x02, 0x08, 0x20, 0x80};
-
 bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     int keypos = 0;
 
     uint64_t nodeNum = 0;
-    uint8_t kc = (uint8_t) key[keypos];
+    auto kc = (uint8_t) key[keypos];
     uint64_t pos = kc;
 
     //******************************************************
@@ -696,58 +693,23 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     // ******************************************************
     while (keypos < keylen && keypos < cutoff_level_) {
         kc = (uint8_t) key[keypos];
-        //Todo: Check if parent cell ids are in node - this pos calculation is
-        // important since kc is the key, e.g.'b'
         pos = (nodeNum << 8) + kc;
 
         __builtin_prefetch(tbitsU_->bits_ + (nodeNum << 2) + (kc >> 6), 0);
         __builtin_prefetch(tbitsU_->rankLUT_ + ((pos + 1) >> 6), 0);
 
-        if (!isCbitSetU(nodeNum, kc)) { //does it have a child
-            return false;
-            // this key does not have a child - check if a parent polygon is present in this node
-            bool parent_cell_candidate_found = false;
-            for (auto i = 0; i < 4; i++) {
-                auto modified_kc = (kc & level_masks[i]) | level_masks_last_flag[i];
-                if (isCbitSetU(nodeNum, modified_kc)) {
-                    parent_cell_candidate_found = true;
-                    //TODO: do we need a check here if T bit is set?
-                    // && !isTbitSet(pos)
-
-                    kc = modified_kc;
-                    //Todo: this would also change the node? not good!
-                    pos = (nodeNum << 8) + kc;
-                    break;
-                }
-            }
-            if (!parent_cell_candidate_found) { return false; }
-            // T bit must not be set -> otherwise the parent has a next child ->
-            // in this case the last one is not the last flag but a legal 1
-            if (!isTbitSetU(nodeNum, kc)) {
-                //Christoph: i think this returns if the current prefix ends
-                value = valuesU_[valuePosU(nodeNum, pos)];
-                return true;
-            }
+        if (!isCbitSetU(nodeNum, kc)) { // is C-label set?
             return false;
         }
         if (!isTbitSetU(nodeNum, kc)) {
-            //Christoph: i think this returns if the current prefix ends
-            //value = valuesU_[valuePosU(nodeNum, pos)];
-            value = 0;
+            // this returns true if there is no child -> value can be found
+            value = valuesU_[valuePosU(nodeNum, pos)];
             return true;
         }
 
         nodeNum = childNodeNumU(pos);
         keypos++;
     }
-
-    //if (keypos < cutoff_level_) {
-    //    if (isObitSetU(nodeNum)) {
-    //        value = valuesU_[valuePosU(nodeNum, (nodeNum << 8))];
-    //        return true;
-    //    }
-    //    return false;
-    //}
 
     //******************************************************
     // SEARCH IN SPARSE NODES
@@ -759,36 +721,9 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
 
         kc = (uint8_t) key[keypos];
-
         int nsize = nodeSize(pos);
 
-        auto pos_tmp = pos;
         if (!nodeSearch(pos, nsize, kc)) {
-            return false;
-            // TODO: we did not find the exact key, but how about parent S2 Cells??
-            // TODO: check for parent S2 Cells
-            bool parent_cell_candidate_found = false;
-            for (auto i = 0; i < 4; i++) {
-                auto modified_kc = (kc & level_masks[i]) | level_masks_last_flag[i];
-                pos = pos_tmp;
-                if (nodeSearch(pos, nsize, modified_kc) && !isTbitSet(pos)) {
-                    //TOdo CHECK if T Bit is not set?!
-                    // important -> found S2-parent must not go on in next child
-                    // otherwise the last 1 is no in this node
-                    parent_cell_candidate_found = true;
-                    break;
-                }
-            }
-            if (!parent_cell_candidate_found) { return false; }
-            // T bit must not be set -> otherwise the parent has a next child ->
-            // in this case the last one is not the last flag but a legal 1
-            if (!isTbitSet(pos)) {
-                //todo careful - we read out of bitvector here
-                uint64_t value_index = valuePos(pos);
-                assert(value_index < number_values);
-                value = values_[valuePos(pos)];
-                return true;
-            }
             return false;
         }
 
@@ -796,8 +731,8 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
             //todo careful - we read out of bitvector here
             //uint64_t value_index = valuePos(pos);
             //assert(value_index < number_values);
-            //value = values_[valuePos(pos)];
-            value = 0;
+            value = values_[valuePos(pos)];
+
             return true;
         }
 
@@ -813,8 +748,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     if (!isTbitSet(pos)) {
         //uint64_t value_index = valuePos(pos);
         //assert(value_index < number_values);
-        //value = values_[value_index];
-        value = 0;
+        value = values_[valuePos(pos)];
         return true;
     }
     return false;
