@@ -31,7 +31,7 @@ uint32_t FST::oMemU() { return o_memU_; }
 
 uint32_t FST::keyMemU() { return (c_memU_ + t_memU_ + o_memU_); }
 
-uint32_t FST::valueMemU() { return val_memU_; }
+uint32_t FST::valueMemU() { return static_cast<uint32_t >(values_U_succinct.size() * 8); }
 
 uint64_t FST::cMem() { return c_mem_; }
 
@@ -76,6 +76,7 @@ FST::insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, 
 inline bool
 FST::insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s,
                 uint32_t &pos, uint32_t &nc, bool set_SBit) {
+
     c.push_back(ch);
     if (!isTerm)
         setBit(t.back(), pos % 64);
@@ -135,6 +136,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     vector<uint64_t> keys_per_level;
     vector<uint32_t > pos_list;
     vector<uint32_t > nc; //node count
+
 
     // init
     for (int i = 0; i < longestKeyLen; i++) {
@@ -303,13 +305,18 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     uint64_t *cbitsU = new uint64_t[c_lenU_];
     uint64_t *tbitsU = new uint64_t[c_lenU_];
     uint64_t *obitsU = new uint64_t[o_lenU_ / 64 + 1];
-    valuesU_ = new uint64_t[vallenU];
+    vbitsU_bits.resize(vallenU / 64 + 1, 0);
 
     // init
     for (int i = 0; i < c_lenU_; i++) {
         cbitsU[i] = 0;
         tbitsU[i] = 0;
     }
+    for (int i = 0; i < vallenU / 64 + 1; i++) {
+        vbitsU_bits[i] = 0;
+    }
+
+
     for (int i = 0; i < (o_lenU_ / 64 + 1); i++)
         obitsU[i] = 0;
 
@@ -358,13 +365,38 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     o_memU_ = obitsU_->getNbits() / 8; //stat
 
     uint64_t val_posU = 0;
+    uint64_t bit_value_posU = 0;
+    uint64_t last_value = 0;
+
+
     for (u_int32_t i = 0; i < cutoff_level_; i++) {
         for (u_int32_t j = 0; j < (u_int32_t) val[i].size(); j++) {
-            valuesU_[val_posU] = val[i][j];
+            if (val_posU == 0) {
+                values_U_succinct.push_back(val[i][j]);
+                last_value = val[i][j];
+
+            } else {
+                if (val[i][j] == last_value) {
+                    // do not save this value -> 0 in bitmap - do nothing
+
+                } else {
+                    // save this value -> 1 in bitmap
+                    values_U_succinct.push_back(val[i][j]);
+                    last_value = val[i][j];
+                    setBit(vbitsU_bits[bit_value_posU / 64], bit_value_posU % 64);
+
+                }
+            }
             val_posU++;
+            bit_value_posU++;
         }
     }
-    val_memU_ = vallenU * 8;
+
+    u_int64_t v_sizeU = (bit_value_posU / 64 / 32 + 1) * 32;
+    vbitsU_bits.resize(v_sizeU, 0);
+    vbitsU_ = new BitmapRankFPoppy(vbitsU_bits.data(), v_sizeU * 64);
+
+    val_memU_ = static_cast<uint32_t >(values_U_succinct.size() * 8 + vbitsU_->getNbits() / 8);
 
     //-------------------------------------------------
     for (int i = cutoff_level_; i < (int) c.size(); i++)
@@ -509,8 +541,8 @@ inline bool FST::isTbitSet(uint64_t pos) {
 // GET VALUE POS U dense
 //******************************************************
 inline uint64_t FST::valuePosU(uint64_t nodeNum, uint64_t pos) {
-    //todo: last obits can be optimized out ???
-    return cbitsU_->rank(pos + 1) - tbitsU_->rank(pos + 1) + obitsU_->rank(nodeNum + 1) - 1;
+    //todo: last obits can be optimized out ??? + obitsU_->rank(nodeNum + 1)
+    return vbitsU_->rank(cbitsU_->rank(pos + 1) - tbitsU_->rank(pos + 1));
 }
 
 //******************************************************
@@ -703,7 +735,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         }
         if (!isTbitSetU(nodeNum, kc)) {
             // this returns true if there is no child -> value can be found
-            value = valuesU_[valuePosU(nodeNum, pos)];
+            value = values_U_succinct[valuePosU(nodeNum, pos)];
             return true;
         }
 
@@ -1019,7 +1051,7 @@ void FST::print_csv() {
     auto resultL = printL();
 
     std::ofstream out_file;
-    std::string out_file_name = "out/fst.csv";
+    std::string out_file_name = "fst.csv";
     out_file.open(out_file_name, std::ios::out | std::ios::app);
 
     auto upper_nodes_number(0);
