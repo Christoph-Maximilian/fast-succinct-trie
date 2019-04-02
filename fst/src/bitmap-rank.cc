@@ -57,6 +57,7 @@ BitmapRankPoppy::BitmapRankPoppy(uint64_t *bits, uint32_t nbits) {
     mem_ = nbits / 8 + basicBlockCount_ * sizeof(uint32_t);
 }
 
+// TODO - rank should be uint64!
 uint32_t BitmapRankPoppy::rank(uint32_t pos) {
     assert(pos <= nbits_);
     uint32_t blockId = pos >> kBasicBlockBits;// == pos / 2^9 == pos / 512

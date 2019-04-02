@@ -101,15 +101,19 @@ private:
     BitmapRankFPoppy* tbitsU_;
     BitmapRankFPoppy* obitsU_;
     BitmapRankFPoppy* vbitsU_;
-    vector<uint64_t > vbitsU_bits;
+    vector<uint64_t > vbitsU_bits_;
     uint64_t* valuesU_;
-    vector<uint64_t > values_U_succinct;
+    vector<uint64_t > values_U_succinct_;
+
+
 
     uint8_t* cbytes_;
     BitmapRankPoppy* tbits_;
     BitmapRankPoppy* vbits_;
     BitmapSelectPoppy* sbits_;
+    vector<uint64_t > vbits_bits_;
     uint64_t* values_;
+    vector<uint64_t > values_succinct_;
 
     //stats
     uint32_t tree_height_;
