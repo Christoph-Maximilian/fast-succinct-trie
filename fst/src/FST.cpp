@@ -32,7 +32,7 @@ uint32_t FST::oMemU() { return o_memU_; }
 
 uint32_t FST::keyMemU() { return (c_memU_ + t_memU_ + o_memU_ + emem_U); }
 
-uint32_t FST::valueMemU() { return val_memU_; }
+uint32_t FST::valueMemU() { return static_cast<uint32_t >(values_U_succinct.size() * 8); }
 
 uint64_t FST::cMem() { return c_mem_; }
 
@@ -149,6 +149,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
 
     vector<uint32_t> pos_list;
     vector<uint32_t> nc; //node count
+
 
     // init
     for (int i = 0; i < longestKeyLen; i++) {
@@ -321,7 +322,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     uint64_t *tbitsU = new uint64_t[c_lenU_];
     uint64_t *ebitsU = new uint64_t[c_lenU_];
     uint64_t *obitsU = new uint64_t[o_lenU_ / 64 + 1];
-    valuesU_ = new uint64_t[vallenU];
+    vbitsU_bits.resize(vallenU / 64 + 1, 0);
 
     // init
     for (int i = 0; i < c_lenU_; i++) {
@@ -329,6 +330,11 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         tbitsU[i] = 0;
         ebitsU[i] = 0;
     }
+    for (int i = 0; i < vallenU / 64 + 1; i++) {
+        vbitsU_bits[i] = 0;
+    }
+
+
     for (int i = 0; i < (o_lenU_ / 64 + 1); i++)
         obitsU[i] = 0;
 
@@ -394,13 +400,38 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     o_memU_ = obitsU_->getNbits() / 8; //stat
 
     uint64_t val_posU = 0;
+    uint64_t bit_value_posU = 0;
+    uint64_t last_value = 0;
+
+
     for (u_int32_t i = 0; i < cutoff_level_; i++) {
         for (u_int32_t j = 0; j < (u_int32_t) val[i].size(); j++) {
-            valuesU_[val_posU] = val[i][j];
+            if (val_posU == 0) {
+                values_U_succinct.push_back(val[i][j]);
+                last_value = val[i][j];
+
+            } else {
+                if (val[i][j] == last_value) {
+                    // do not save this value -> 0 in bitmap - do nothing
+
+                } else {
+                    // save this value -> 1 in bitmap
+                    values_U_succinct.push_back(val[i][j]);
+                    last_value = val[i][j];
+                    setBit(vbitsU_bits[bit_value_posU / 64], bit_value_posU % 64);
+
+                }
+            }
             val_posU++;
+            bit_value_posU++;
         }
     }
-    val_memU_ = vallenU * 8;
+
+    u_int64_t v_sizeU = (bit_value_posU / 64 / 32 + 1) * 32;
+    vbitsU_bits.resize(v_sizeU, 0);
+    vbitsU_ = new BitmapRankFPoppy(vbitsU_bits.data(), v_sizeU * 64);
+
+    val_memU_ = static_cast<uint32_t >(values_U_succinct.size() * 8 + vbitsU_->getNbits() / 8);
 
     //-------------------------------------------------
     for (int i = cutoff_level_; i < (int) c.size(); i++)
@@ -582,7 +613,8 @@ inline bool FST::isEbitSet(uint64_t pos) {
 // GET VALUE POS U dense
 //******************************************************
 inline uint64_t FST::valuePosU(uint64_t nodeNum, uint64_t pos) {
-    return cbitsU_->rank(pos + 1) - tbitsU_->rank(pos + 1) + obitsU_->rank(nodeNum + 1) - 1;
+    //todo: last obits can be optimized out ??? + obitsU_->rank(nodeNum + 1)
+    return vbitsU_->rank(cbitsU_->rank(pos + 1) - tbitsU_->rank(pos + 1));
 }
 
 //******************************************************
@@ -801,14 +833,14 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
             // in this case the last one is not the last flag but a legal 1
             if (!isTbitSetU(nodeNum, kc)) {
                 //Christoph: i think this returns if the current prefix ends
-                value = valuesU_[valuePosU(nodeNum, pos)];
+                value = values_U_succinct[valuePosU(nodeNum, pos)];
                 return true;
             }
             return false;
         }
         if (!isTbitSetU(nodeNum, kc)) {
-            //Christoph: i think this returns if the current prefix ends
-            value = valuesU_[valuePosU(nodeNum, pos)];
+            // this returns true if there is no child -> value can be found
+            value = values_U_succinct[valuePosU(nodeNum, pos)];
             return true;
         }
 
@@ -858,8 +890,6 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
             // in this case the last one is not the last flag but a legal 1
             if (!isTbitSet(pos)) {
                 //todo careful - we read out of bitvector here
-                uint64_t value_index = valuePos(pos);
-                assert(value_index < number_values);
                 value = values_[valuePos(pos)];
                 return true;
             }
@@ -868,8 +898,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
         if (!isTbitSet(pos)) {
             //todo careful - we read out of bitvector here
-            uint64_t value_index = valuePos(pos);
-            assert(value_index < number_values);
+
             value = values_[valuePos(pos)];
             return true;
         }
@@ -885,7 +914,6 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     //TODO: this is the important part -> here we detect that , added by @Christoph
     if (!isTbitSet(pos)) {
         uint64_t value_index = valuePos(pos);
-        assert(value_index < number_values);
         value = values_[value_index];
         return true;
     }
