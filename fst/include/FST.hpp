@@ -105,10 +105,14 @@ private:
     BitmapRankFPoppy* cbitsU_;
     BitmapRankFPoppy* tbitsU_;
     BitmapRankFPoppy* obitsU_;
+    BitmapRankFPoppy* vbitsU_;
+    vector<uint64_t > vbitsU_bits;
     uint64_t* valuesU_;
+    vector<uint64_t > values_U_succinct;
 
     uint8_t* cbytes_;
     BitmapRankPoppy* tbits_;
+    BitmapRankPoppy* vbits_;
     BitmapSelectPoppy* sbits_;
     uint64_t* values_;
 
