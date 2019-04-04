@@ -54,6 +54,9 @@ public:
     uint64_t mem();
     uint64_t memEBits();
 
+    vector<uint32_t > nc_;
+    vector<uint64_t > keys_per_level_;
+
     uint32_t numT();
 
     std::vector<std::vector<std::string>> printU();
@@ -61,8 +64,8 @@ public:
     void print_csv();
 
 private:
-    inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, vector<uint64_t> &e, int &pos, int &nc, bool set_e_bit);
-    inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, vector<uint64_t> &e, int &pos, int &nc, bool set_e_bit);
+    inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, vector<uint64_t> &e, uint32_t &pos, uint32_t &nc, bool set_e_bit);
+    inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, vector<uint64_t> &e, uint32_t &pos, uint32_t &nc, bool set_e_bit);
 
     inline bool isCbitSetU(uint64_t nodeNum, uint8_t kc);
     inline bool isTbitSetU(uint64_t nodeNum, uint8_t kc);
@@ -125,9 +128,9 @@ private:
     uint32_t val_memU_;
 
     uint64_t c_mem_;
-    uint32_t t_mem_;
-    uint32_t e_mem_;
-    uint32_t s_mem_;
+    uint64_t t_mem_;
+    uint64_t e_mem_;
+    uint64_t s_mem_;
     uint64_t val_mem_;
 
     uint32_t num_t_;
@@ -145,7 +148,7 @@ typedef struct {
 class FSTIter {
 public:
     FSTIter();
-    FSTIter(FST* idx);
+    explicit FSTIter(FST* idx);
 
     void clear ();
 
