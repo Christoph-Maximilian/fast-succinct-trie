@@ -75,12 +75,15 @@ FST::insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, 
 
 inline bool
 FST::insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s,
-                uint32_t &pos, uint32_t &nc) {
+                uint32_t &pos, uint32_t &nc, bool set_SBit) {
     c.push_back(ch);
     if (!isTerm)
         setBit(t.back(), pos % 64);
-    setBit(s.back(), pos % 64);
-    nc++;
+    if (set_SBit) {
+        setBit(s.back(), pos % 64);
+        nc++;
+    }
+
     pos++;
     if (pos % 64 == 0) {
         t.push_back(0);
@@ -116,7 +119,10 @@ std::string FST::export_stats() {
 //******************************************************
 // LOAD
 //******************************************************
-void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen) {
+
+uint8_t denorm_levels[4] = {1, 4, 16, 64};
+
+void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLen) {
     number_values = values.size();
     tree_height_ = static_cast<uint32_t >(longestKeyLen);
     vector<vector<uint8_t> > c;
@@ -144,67 +150,76 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
     }
 
     int last_value_level = 0;
-    for (int k = 0; k < (int) keys.size(); k++) {
-        string key = keys[k];
-        uint64_t value = values[k];
+    auto index = 0;
 
-        // if same key
-        if (k < (int) (keys.size() - 1) && key.compare(keys[k + 1]) == 0)
-            continue;
+    uint8_t key[8];
+    auto value_index = -1;
+    while (index < keys.size()) {
+        value_index++;
+        auto info_byte = keys[index];
+        auto number_denorm_cells = denorm_levels[info_byte >> 6];
+        auto number_common_cells = info_byte & 15;
+        auto key_size = number_common_cells + 1;
+
+        for (auto ncl = 0; ncl < number_common_cells; ncl++) {
+            index++;
+            key[ncl] = keys[index];
+        }
+
+        index++;
+        auto end_index = index + number_denorm_cells;
+
+
+        // set denormalize cell at the end
+        key[number_common_cells] = keys[index];
+        uint64_t value = values[value_index];
 
         int i = 0;
-        while (i < key.length() && !insertChar_cond((uint8_t) key[i], c[i], t[i], s[i], pos_list[i], nc[i])) {
-            //insertChar_cond((uint8_t)key[i], c[i], t[i], s[i], pos_list[i], nc[i]);
+        while (i < key_size && !insertChar_cond((uint8_t) key[i], c[i], t[i], s[i], pos_list[i], nc[i])) {
             i++;
         }
 
-
-        if (i < key.length()) {
-            if (k + 1 < (int) keys.size() or true) {
-                auto cpl = static_cast<uint32_t >(key.length()); //commonPrefixLen(key, keys[k + 1]);
-                if (i < (cpl - 1)) {
-                    // There will be a child node -> set T bit of corresponding position within node
-                    if (pos_list[i] % 64 == 0)
-                        setBit(t[i].rbegin()[1], 63);
-                    else
-                        setBit(t[i].back(), (pos_list[i] - 1) % 64);
-                }
-
-                while (i < (cpl - 1)) {
-                    i++;
-                    if (i < (cpl - 1))
-                        insertChar((uint8_t) key[i], false, c[i], t[i], s[i], pos_list[i], nc[i]);
-                    else {
-                        //if (i < key.length())
-                        insertChar((uint8_t) key[i], true, c[i], t[i], s[i], pos_list[i], nc[i]);
-                        /*else {
-                            insertChar(TERM, true, c[i], t[i], s[i], pos_list[i], nc[i]);
-                            num_t_++; //stat number terms
-                        }*/
-                    }
-                }
+        if (i < key_size) {
+            //  todo commented out: if (k + 1 < (int) key_size) {...
+            auto cpl = static_cast<uint32_t >(key_size); //commonPrefixLen(key, keys[k + 1]);
+            if (i < (cpl - 1)) {
+                // There will be a child node -> set T bit of corresponding position within node
+                if (pos_list[i] % 64 == 0)
+                    setBit(t[i].rbegin()[1], 63);
+                else
+                    setBit(t[i].back(), (pos_list[i] - 1) % 64);
             }
-            val[i].push_back(value);
+            // the first (denormalized) key MAY be inserted in insertChar
+            if (i == key_size - 1) {
+                index++;
+            }
+            while (i < (cpl - 1)) {
+                i++;
+                if (i < (cpl - 1))
+                    insertChar((uint8_t) key[i], false, c[i], t[i], s[i], pos_list[i], nc[i], true);
+            }
+            for (; index < end_index; index++) {
+                key[number_common_cells] = keys[index];
+                insertChar((uint8_t) key[i], true, c[i], t[i], s[i], pos_list[i], nc[i],
+                           end_index - index == number_denorm_cells);
+            }
+
+            // todo: save values more efficiently here
+            for (auto nv = 0; nv < number_denorm_cells; nv++) {
+                val[i].push_back(value);
+            }
         } else
             cout << "ERROR!\n";
 
-        if (k >= keys.size() - 1)
+        if (index >= keys.size() - 1)
             last_value_level = i;
+
     }
 
     // put together
     int nc_total = 0;
     for (int i = 0; i < (int) nc.size(); i++)
         nc_total += nc[i];
-
-    /*
-    int nc_u = 0;
-    while (nc_u * CUTOFF_RATIO < nc_total) {
-        nc_u += nc[cutoff_level_];
-        cutoff_level_++;
-    }
-    cutoff_level_--;
-    */
 
     cout << "cutoff_level_ = " << cutoff_level_ << "\n";
 
@@ -249,21 +264,16 @@ void FST::load(vector<string> &keys, vector<uint64_t> &values, int longestKeyLen
                         tU[i].push_back(0);
                     }
                     nodeCountU_++;
-                    // Todo this must be wrong?! we do not use terms -> add false for testing
-                    if (ch == TERM && false)
-                        oU[i].push_back(1);
-                    else {
-                        oU[i].push_back(0);
-                        setLabel((uint64_t *) cU[i].data() + cU[i].size() - 4, ch);
-                        if (readBit(t[i][j], k)) {
-                            setLabel((uint64_t *) tU[i].data() + tU[i].size() - 4, ch);
-                            childCountU_++;
-                        }
+                    oU[i].push_back(0);
+                    setLabel( cU[i].data() + cU[i].size() - 4, ch);
+                    if (readBit(t[i][j], k)) {
+                        setLabel( tU[i].data() + tU[i].size() - 4, ch);
+                        childCountU_++;
                     }
                 } else {
-                    setLabel((uint64_t *) cU[i].data() + cU[i].size() - 4, ch);
+                    setLabel(cU[i].data() + cU[i].size() - 4, ch);
                     if (readBit(t[i][j], k)) {
-                        setLabel((uint64_t *) tU[i].data() + tU[i].size() - 4, ch);
+                        setLabel(tU[i].data() + tU[i].size() - 4, ch);
                         childCountU_++;
                     }
                 }
@@ -477,7 +487,7 @@ void FST::load(vector<uint64_t> &keys, vector<uint64_t> &values) {
         reinterpret_cast<uint64_t *>(key)[0] = __builtin_bswap64(keys[i]);
         keys_str.push_back(string(key, 8));
     }
-    load(keys_str, values, sizeof(uint64_t));
+    //load(keys_str, values, sizeof(uint64_t));
 }
 
 //******************************************************

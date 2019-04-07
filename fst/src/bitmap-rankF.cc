@@ -50,9 +50,9 @@ BitmapRankFPoppy::BitmapRankFPoppy(uint64_t *bits, uint64_t nbits)
     mem_ = nbits / 8 + basicBlockCount_ * sizeof(uint32_t);
 }
 
-uint64_t BitmapRankFPoppy::rank(uint64_t pos)
+inline uint64_t BitmapRankFPoppy::rank(uint64_t pos)
 {
-    assert(pos <= nbits_);
+    //assert(pos <= nbits_);
     uint64_t blockId = pos >> kBasicBlockBits;
     auto offset = static_cast<uint32_t > (pos & (uint32_t)63);
     if (offset)
