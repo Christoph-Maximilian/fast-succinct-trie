@@ -130,6 +130,9 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     vector<vector<uint64_t> > s;
     vector<vector<uint64_t> > val;
 
+    vector<std::pair<vector<uint64_t >, vector<uint32_t >>> val_succ_tmp(longestKeyLen);
+    vector<uint64_t > values_count_per_level(longestKeyLen);
+
     vector<uint64_t> keys_per_level;
     vector<uint32_t> pos_list;
     vector<uint32_t> nc; //node count
@@ -205,8 +208,20 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
             }
 
             // todo: save values more efficiently here
-            for (auto nv = 0; nv < number_denorm_cells; nv++) {
-                val[i].push_back(value);
+            for (auto nv = 0; nv < 1; nv++) {
+                values_count_per_level[i]+=number_denorm_cells;
+                if (val_succ_tmp[i].first.empty()) {
+                    val_succ_tmp[i].first.push_back(value);
+                    val_succ_tmp[i].second.push_back(number_denorm_cells);
+                    break;
+                }
+                if (*val_succ_tmp[i].first.rbegin() == value) {
+                    (*val_succ_tmp[i].second.rbegin())+= number_denorm_cells;
+                }
+                else {
+                    val_succ_tmp[i].first.push_back(value);
+                    val_succ_tmp[i].second.push_back(number_denorm_cells);
+                }
             }
         } else
             cout << "ERROR!\n";
@@ -287,7 +302,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     for (int i = 0; i < (int) cU.size(); i++) {
         c_lenU_ += cU[i].size();
         o_lenU_ += oU[i].size();
-        vallenU += val[i].size();
+        vallenU += values_count_per_level[i];
     }
 
     uint64_t *cbitsU = new uint64_t[c_lenU_];
@@ -358,25 +373,12 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
 
 
     for (u_int32_t i = 0; i < cutoff_level_; i++) {
-        for (u_int32_t j = 0; j < (u_int32_t) val[i].size(); j++) {
-            if (val_posU == 0) {
-                values_U_succinct.push_back(val[i][j]);
-                last_value = val[i][j];
-
-            } else {
-                if (val[i][j] == last_value) {
-                    // do not save this value -> 0 in bitmap - do nothing
-
-                } else {
-                    // save this value -> 1 in bitmap
-                    values_U_succinct.push_back(val[i][j]);
-                    last_value = val[i][j];
-                    setBit(vbitsU_bits[bit_value_posU / 64], bit_value_posU % 64);
-
-                }
-            }
-            val_posU++;
-            bit_value_posU++;
+        //concat values
+        values_U_succinct.insert(values_U_succinct.end(),val_succ_tmp[i].first.begin(), val_succ_tmp[i].first.end() );
+        // set bitmap
+        for (u_int32_t j = 0; j < (u_int32_t) val_succ_tmp[i].second.size(); j++) {
+            bit_value_posU += val_succ_tmp[i].second[j];
+            setBit(vbitsU_bits[bit_value_posU / 64], bit_value_posU % 64);
         }
     }
 
@@ -391,7 +393,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         c_mem_ += c[i].size();
 
     for (int i = cutoff_level_; i < (int) c.size(); i++)
-        val_mem_ += val[i].size() * sizeof(uint64_t);
+        val_mem_ += values_count_per_level[i] * sizeof(uint64_t);
 
     if (c_mem_ % 64 == 0) {
         t_mem_ = c_mem_ / 64;
@@ -465,9 +467,14 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
 
     uint64_t val_pos = 0;
     for (int i = cutoff_level_; i < (int) val.size(); i++) {
-        for (int j = 0; j < (int) val[i].size(); j++) {
-            values_[val_pos] = val[i][j];
-            val_pos++;
+
+
+        for (int j = 0; j < (int) val_succ_tmp[i].second.size(); j++) {
+            for (int k = 0; k < val_succ_tmp[i].second[j]; k++) {
+                values_[val_pos] = val_succ_tmp[i].first[j];
+                val_pos++;
+            }
+
         }
     }
     //-------------------------------------------------
