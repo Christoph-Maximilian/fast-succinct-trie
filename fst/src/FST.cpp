@@ -572,6 +572,9 @@ inline int FST::nodeSize(uint64_t pos) {
     uint64_t startIdx = pos >> 6;
     // for the shift, only the six lowest level bits are relevant
     uint64_t shift = pos & (uint64_t) 0x3F;
+    if (startIdx > sbits_->nbits_ / sbits_->kWordSize) {
+        std::cout << "ERROR sbits pos=" << pos << " startIdx=" << startIdx << "size of s lut: " <<  sbits_->nbits_ / sbits_->kWordSize + 1 << std::endl;
+    }
     uint64_t bits = sbits_->bits_[startIdx] << shift;
 
     if (bits > 0) //counting the number of leading zeros + 1 = nodesize

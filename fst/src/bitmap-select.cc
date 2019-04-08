@@ -39,7 +39,7 @@ BitmapSelectPoppy::BitmapSelectPoppy(uint64_t *bits, uint64_t nbits)
     assert(posix_memalign((void **) &rankLUT, kCacheLineSize, (wordCount_ + 1) * sizeof(uint32_t)) >= 0);
 
     uint64_t rankCum = 0;
-    for (uint32_t i = 0; i < wordCount_; i++) {
+    for (uint64_t i = 0; i < wordCount_; i++) {
 	rankLUT[i] = rankCum;
 	rankCum += popcount(bits_[i]);
     }
@@ -53,7 +53,7 @@ BitmapSelectPoppy::BitmapSelectPoppy(uint64_t *bits, uint64_t nbits)
     uint64_t idx = 1;
     for (uint64_t i = 1; i <= wordCount_; i++) {
 	while (idx * skip <= rankLUT[i]) {
-        int64_t rankR = idx * skip - rankLUT[i-1];
+        uint64_t rankR = idx * skip - rankLUT[i-1];
 	    selectLUT_[idx] = (i - 1) * kWordSize + select64_popcount_search(bits_[i-1], rankR) + 1;
 	    idx++;
 	}
