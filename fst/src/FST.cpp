@@ -23,21 +23,21 @@ FST::~FST() {
 }
 
 //stat
-uint32_t FST::cMemU() { return c_memU_; }
+uint64_t FST::cMemU() { return c_memU_; }
 
-uint32_t FST::tMemU() { return t_memU_; }
+uint64_t FST::tMemU() { return t_memU_; }
 
-uint32_t FST::oMemU() { return o_memU_; }
+uint64_t FST::oMemU() { return o_memU_; }
 
-uint32_t FST::keyMemU() { return (c_memU_ + t_memU_ + o_memU_); }
+uint64_t FST::keyMemU() { return (c_memU_ + t_memU_ + o_memU_); }
 
-uint32_t FST::valueMemU() { return static_cast<uint32_t >(values_U_succinct.size() * 8); }
+uint64_t FST::valueMemU() { return static_cast<uint32_t >(values_U_succinct.size() * 8); }
 
 uint64_t FST::cMem() { return c_mem_; }
 
-uint32_t FST::tMem() { return t_mem_; }
+uint64_t FST::tMem() { return t_mem_; }
 
-uint32_t FST::sMem() { return s_mem_; }
+uint64_t FST::sMem() { return s_mem_; }
 
 uint64_t FST::keyMem() { return (c_mem_ + t_mem_ + s_mem_); }
 
@@ -50,8 +50,8 @@ uint32_t FST::numT() { return num_t_; }
 
 //*******************************************************************
 inline bool
-FST::insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos,
-                     uint32_t &nc) {
+FST::insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint64_t &pos,
+                     uint64_t &nc) {
     if (c.empty() || c.back() != ch) {
         c.push_back(ch);
         if (c.size() == 1) {
@@ -75,8 +75,7 @@ FST::insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, 
 
 inline bool
 FST::insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s,
-                uint32_t &pos, uint32_t &nc, bool set_SBit) {
-
+                uint64_t &pos, uint64_t &nc, bool set_SBit) {
     c.push_back(ch);
     if (!isTerm)
         setBit(t.back(), pos % 64);
@@ -134,8 +133,8 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     vector<uint64_t> values_count_per_level(longestKeyLen);
 
     vector<uint64_t> keys_per_level;
-    vector<uint32_t > pos_list;
-    vector<uint32_t > nc; //node count
+    vector<uint64_t> pos_list;
+    vector<uint64_t> nc; //node count
 
 
     // init
@@ -209,11 +208,19 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
                            end_index - index == number_denorm_cells);
             }
 
-            // todo: save values more efficiently here
-            number_values += number_denorm_cells;
-            for (auto nv = 0; nv < number_denorm_cells; nv++) {
-                val[i].push_back(value);
-
+            for (auto nv = 0; nv < 1; nv++) {
+                values_count_per_level[i] += number_denorm_cells;
+                if (val_succ_tmp[i].first.empty()) {
+                    val_succ_tmp[i].first.push_back(value);
+                    val_succ_tmp[i].second.push_back(number_denorm_cells);
+                    break;
+                }
+                if (*val_succ_tmp[i].first.rbegin() == value) {
+                    (*val_succ_tmp[i].second.rbegin()) += number_denorm_cells;
+                } else {
+                    val_succ_tmp[i].first.push_back(value);
+                    val_succ_tmp[i].second.push_back(number_denorm_cells);
+                }
             }
         } else
             cout << "ERROR!\n";
@@ -224,7 +231,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     }
 
     // put together
-    int nc_total = 0;
+    uint64_t nc_total = 0;
     for (int i = 0; i < (int) nc.size(); i++)
         nc_total += nc[i];
 
@@ -257,9 +264,9 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         uint64_t smaxPos_i = pos_list[i];
 
         uint8_t ch = 0;
-        uint32_t j = 0;
-        uint32_t k = 0;
-        for (j = 0; j < (int) s[i].size(); j++) {
+        uint64_t j = 0;
+        uint64_t k = 0;
+        for (j = 0; j < s[i].size(); j++) {
             if (sbitPos_i >= smaxPos_i) break;
             for (k = 0; k < 64; k++) {
                 if (sbitPos_i >= smaxPos_i) break;
@@ -271,16 +278,12 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
                         tU[i].push_back(0);
                     }
                     nodeCountU_++;
-                    // Todo this must be wrong?! we do not use terms -> add false for testing
-                    if (ch == TERM && false)
-                        oU[i].push_back(1);
-                    else {
-                        oU[i].push_back(0);
-                        setLabel((uint64_t *) cU[i].data() + cU[i].size() - 4, ch);
-                        if (readBit(t[i][j], k)) {
-                            setLabel((uint64_t *) tU[i].data() + tU[i].size() - 4, ch);
-                            childCountU_++;
-                        }
+
+                    oU[i].push_back(0);
+                    setLabel(cU[i].data() + cU[i].size() - 4, ch);
+                    if (readBit(t[i][j], k)) {
+                        setLabel(tU[i].data() + tU[i].size() - 4, ch);
+                        childCountU_++;
                     }
                 } else {
                     setLabel((uint64_t *) cU[i].data() + cU[i].size() - 4, ch);
@@ -296,34 +299,34 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
 
     o_lenU_ = 0;
     u_int64_t vallenU = 0;
-    for (int i = 0; i < (int) cU.size(); i++) {
+    for (uint64_t i = 0; i < cU.size(); i++) {
         c_lenU_ += cU[i].size();
         o_lenU_ += oU[i].size();
         vallenU += val[i].size();
     }
 
-    uint64_t *cbitsU = new uint64_t[c_lenU_];
-    uint64_t *tbitsU = new uint64_t[c_lenU_];
-    uint64_t *obitsU = new uint64_t[o_lenU_ / 64 + 1];
+    auto *cbitsU = new uint64_t[c_lenU_];
+    auto *tbitsU = new uint64_t[c_lenU_];
+    auto *obitsU = new uint64_t[o_lenU_ / 64 + 1];
     vbitsU_bits.resize(vallenU / 64 + 1, 0);
 
     // init
-    for (int i = 0; i < c_lenU_; i++) {
+    for (uint64_t i = 0; i < c_lenU_; i++) {
         cbitsU[i] = 0;
         tbitsU[i] = 0;
     }
-    for (int i = 0; i < vallenU / 64 + 1; i++) {
+    for (uint64_t i = 0; i < vallenU / 64 + 1; i++) {
         vbitsU_bits[i] = 0;
     }
 
 
-    for (int i = 0; i < (o_lenU_ / 64 + 1); i++)
+    for (uint64_t i = 0; i < (o_lenU_ / 64 + 1); i++)
         obitsU[i] = 0;
 
     uint64_t c_bitPosU = 0;
-    for (u_int32_t i = 0; i < (u_int32_t) cU.size(); i++) {
-        for (u_int32_t j = 0; j < (u_int32_t) cU[i].size(); j++) {
-            for (u_int32_t k = 0; k < 64; k++) {
+    for (uint64_t i = 0; i < cU.size(); i++) {
+        for (uint64_t j = 0; j < cU[i].size(); j++) {
+            for (uint64_t k = 0; k < 64; k++) {
                 if (readBit(cU[i][j], k)) {
                     setBit(cbitsU[c_bitPosU / 64], c_bitPosU % 64);
                 }
@@ -337,9 +340,9 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     c_memU_ = cbitsU_->getNbits() / 8; //stat
 
     uint64_t t_bitPosU = 0;
-    for (u_int32_t i = 0; i < (u_int32_t) tU.size(); i++) {
-        for (u_int32_t j = 0; j < (u_int32_t) tU[i].size(); j++) {
-            for (u_int32_t k = 0; k < 64; k++) {
+    for (uint64_t i = 0; i < tU.size(); i++) {
+        for (uint64_t j = 0; j < tU[i].size(); j++) {
+            for (uint64_t k = 0; k < 64; k++) {
                 if (readBit(tU[i][j], k))
                     setBit(tbitsU[t_bitPosU / 64], t_bitPosU % 64);
                 t_bitPosU++;
@@ -347,13 +350,15 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         }
     }
 
+    assert (t_bitPosU < c_bitPosU);
     u_int64_t t_sizeU = (c_lenU_ / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
     tbitsU_ = new BitmapRankFPoppy(tbitsU, t_sizeU * 64);
     t_memU_ = tbitsU_->getNbits() / 8; //stat
 
+    //todo remove this part?
     uint64_t o_bitPosU = 0;
-    for (int i = 0; i < (int) oU.size(); i++) {
-        for (int j = 0; j < (int) oU[i].size(); j++) {
+    for (uint64_t i = 0; i < oU.size(); i++) {
+        for (uint64_t j = 0; j < oU[i].size(); j++) {
             if (oU[i][j] == 1)
                 setBit(obitsU[o_bitPosU / 64], o_bitPosU % 64);
             o_bitPosU++;
@@ -370,25 +375,12 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
 
 
     for (u_int32_t i = 0; i < cutoff_level_; i++) {
-        for (u_int32_t j = 0; j < (u_int32_t) val[i].size(); j++) {
-            if (val_posU == 0) {
-                values_U_succinct.push_back(val[i][j]);
-                last_value = val[i][j];
-
-            } else {
-                if (val[i][j] == last_value) {
-                    // do not save this value -> 0 in bitmap - do nothing
-
-                } else {
-                    // save this value -> 1 in bitmap
-                    values_U_succinct.push_back(val[i][j]);
-                    last_value = val[i][j];
-                    setBit(vbitsU_bits[bit_value_posU / 64], bit_value_posU % 64);
-
-                }
-            }
-            val_posU++;
-            bit_value_posU++;
+        //concat values
+        values_U_succinct.insert(values_U_succinct.end(), val_succ_tmp[i].first.begin(), val_succ_tmp[i].first.end());
+        // set bitmap
+        for (uint64_t j = 0; j < val_succ_tmp[i].second.size(); j++) {
+            bit_value_posU += val_succ_tmp[i].second[j];
+            setBit(vbitsU_bits[bit_value_posU / 64], bit_value_posU % 64);
         }
     }
 
@@ -399,11 +391,12 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     val_memU_ = static_cast<uint32_t >(values_U_succinct.size() * 8 + vbitsU_->getNbits() / 8);
 
     //-------------------------------------------------
-    for (int i = cutoff_level_; i < (int) c.size(); i++)
+    for (int i = cutoff_level_; i < c.size(); i++)
         c_mem_ += c[i].size();
 
-    for (int i = cutoff_level_; i < (int) c.size(); i++)
-        val_mem_ += val[i].size() * sizeof(uint64_t);
+
+    for (int i = cutoff_level_; i < c.size(); i++)
+        val_mem_ += values_count_per_level[i] * sizeof(uint64_t);
 
     if (c_mem_ % 64 == 0) {
         t_mem_ = c_mem_ / 64;
@@ -417,12 +410,12 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     s_mem_ = (s_mem_ / 32 + 1) * 32; // round-up to 2048-bit block size for Poppy
 
     cbytes_ = new uint8_t[c_mem_];
-    uint64_t *tbits = new uint64_t[t_mem_];
-    uint64_t *sbits = new uint64_t[s_mem_];
+    auto *tbits = new uint64_t[t_mem_];
+    auto *sbits = new uint64_t[s_mem_];
     values_ = new uint64_t[val_mem_ / sizeof(uint64_t)];
 
     // init
-    for (int i = 0; i < t_mem_; i++) {
+    for (uint64_t i = 0; i < t_mem_; i++) {
         tbits[i] = 0;
         sbits[i] = 0;
     }
@@ -431,7 +424,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
 
     uint64_t c_pos = 0;
     for (int i = cutoff_level_; i < (int) c.size(); i++) {
-        for (int j = 0; j < (int) c[i].size(); j++) {
+        for (uint64_t j = 0; j < c[i].size(); j++) {
             cbytes_[c_pos] = c[i][j];
             c_pos++;
         }
@@ -441,9 +434,9 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     for (int i = cutoff_level_; i < (int) t.size(); i++) {
         uint64_t bitPos_i = 0;
         uint64_t maxPos_i = pos_list[i];
-        for (int j = 0; j < (int) t[i].size(); j++) {
+        for (uint64_t j = 0; j < t[i].size(); j++) {
             if (bitPos_i >= maxPos_i) break;
-            for (int k = 0; k < 64; k++) {
+            for (uint64_t k = 0; k < 64; k++) {
                 if (bitPos_i >= maxPos_i) break;
                 if (readBit(t[i][j], k))
                     setBit(tbits[t_bitPos / 64], t_bitPos % 64);
@@ -460,7 +453,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     for (int i = cutoff_level_; i < (int) s.size(); i++) {
         uint64_t bitPos_i = 0;
         uint64_t maxPos_i = pos_list[i];
-        for (int j = 0; j < (int) s[i].size(); j++) {
+        for (uint64_t j = 0; j < s[i].size(); j++) {
             if (bitPos_i >= maxPos_i) break;
             for (int k = 0; k < 64; k++) {
                 if (bitPos_i >= maxPos_i) break;
@@ -477,9 +470,11 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
 
     uint64_t val_pos = 0;
     for (int i = cutoff_level_; i < (int) val.size(); i++) {
-        for (int j = 0; j < (int) val[i].size(); j++) {
-            values_[val_pos] = val[i][j];
-            val_pos++;
+        for (int j = 0; j < (int) val_succ_tmp[i].second.size(); j++) {
+            for (uint64_t k = 0; k < val_succ_tmp[i].second[j]; k++) {
+                values_[val_pos] = val_succ_tmp[i].first[j];
+                val_pos++;
+            }
         }
     }
     //-------------------------------------------------
@@ -541,8 +536,7 @@ inline bool FST::isTbitSet(uint64_t pos) {
 // GET VALUE POS U dense
 //******************************************************
 inline uint64_t FST::valuePosU(uint64_t nodeNum, uint64_t pos) {
-    //todo: last obits can be optimized out ??? + obitsU_->rank(nodeNum + 1)
-    return vbitsU_->rank(cbitsU_->rank(pos + 1) - tbitsU_->rank(pos + 1));
+    return vbitsU_->rank(cbitsU_->rank(pos + 1)-tbitsU_->rank(pos + 1));
 }
 
 //******************************************************

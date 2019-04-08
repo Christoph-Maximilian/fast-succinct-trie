@@ -37,21 +37,21 @@ public:
 
     uint64_t * get_values();
 
-    uint32_t cMemU();
-    uint32_t tMemU();
-    uint32_t oMemU();
-    uint32_t keyMemU();
-    uint32_t valueMemU();
+    uint64_t cMemU();
+    uint64_t tMemU();
+    uint64_t oMemU();
+    uint64_t keyMemU();
+    uint64_t valueMemU();
 
     uint64_t cMem();
-    uint32_t tMem();
-    uint32_t sMem();
+    uint64_t tMem();
+    uint64_t sMem();
     uint64_t keyMem();
     uint64_t valueMem();
     uint64_t number_values;
     uint64_t mem();
 
-    vector<uint32_t > nc_;
+    vector<uint64_t > nc_;
     vector<uint64_t > keys_per_level_;
 
     uint32_t numT();
@@ -61,8 +61,8 @@ public:
     void print_csv();
 
 private:
-    inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos, uint32_t &nc);
-    inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos, uint32_t &nc, bool set_SBit);
+    inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint64_t &pos, uint64_t &nc);
+    inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint64_t &pos, uint64_t &nc, bool set_SBit);
 
     inline bool isCbitSetU(uint64_t nodeNum, uint8_t kc);
     inline bool isTbitSetU(uint64_t nodeNum, uint8_t kc);
@@ -116,20 +116,20 @@ private:
     uint32_t tree_height_;
     int32_t last_value_pos_; // negative means in valuesU_
 
-    uint32_t c_lenU_;
-    uint32_t o_lenU_;
+    uint64_t c_lenU_;
+    uint64_t o_lenU_;
 
-    uint32_t c_memU_;
-    uint32_t t_memU_;
-    uint32_t o_memU_;
-    uint32_t val_memU_;
+    uint64_t c_memU_;
+    uint64_t t_memU_;
+    uint64_t o_memU_;
+    uint64_t val_memU_;
 
     uint64_t c_mem_;
     uint64_t t_mem_;
     uint64_t s_mem_;
     uint64_t val_mem_;
 
-    uint32_t num_t_;
+    uint64_t num_t_;
 
     friend class FSTIter;
 };

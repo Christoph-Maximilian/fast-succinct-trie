@@ -43,35 +43,35 @@ public:
     const uint32_t kSkipMask = ((uint32_t)1 << kSkipBits) - 1;
 
     BitmapSelect() { }
-    virtual uint32_t select(uint32_t rank) = 0;
+    virtual uint64_t select(uint64_t rank) = 0;
 };
 
 class BitmapSelectPoppy: public BitmapSelect {
 public:
-    BitmapSelectPoppy(uint64_t* bits, uint32_t nbits);
+    BitmapSelectPoppy(uint64_t* bits, uint64_t nbits);
     ~BitmapSelectPoppy() {
         delete[] bits_;
         delete[] selectLUT_;
     }
-    
-    uint32_t select(uint32_t rank);
+
+    uint64_t select(uint64_t rank);
 
     uint64_t* getBits();
-    uint32_t getNbits();
-    uint32_t getMem();
+    uint64_t getNbits();
+    uint64_t getMem();
 
     friend class FST;
     friend class FSTIter;
 
 private:
     uint64_t* bits_;
-    uint32_t  nbits_;
-    uint32_t  mem_;
+    uint64_t  nbits_;
+    uint64_t  mem_;
 
-    uint32_t  wordCount_;
-    uint32_t  pCount_;
-    uint32_t* selectLUT_;
-    uint32_t  selectLUTCount_;
+    uint64_t  wordCount_;
+    uint64_t  pCount_;
+    uint64_t* selectLUT_;
+    uint64_t  selectLUTCount_;
 };
 
 #endif /* _BITMAPSELECT_H_ */

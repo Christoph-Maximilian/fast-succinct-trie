@@ -34,11 +34,11 @@ BitmapRankFPoppy::BitmapRankFPoppy(uint64_t *bits, uint64_t nbits)
     bits_ = bits;
     nbits_ = nbits;
     basicBlockCount_ = nbits_ / kBasicBlockSize;
-    rankLUT_ = new uint32_t[basicBlockCount_];
+    rankLUT_ = new uint64_t[basicBlockCount_];
     assert(posix_memalign((void **) &rankLUT_, kCacheLineSize, basicBlockCount_ * sizeof(uint32_t)) >= 0);
 
-    uint32_t rankCum = 0;
-    for (uint32_t i = 0; i < basicBlockCount_; i++) {
+    uint64_t rankCum = 0;
+    for (uint64_t i = 0; i < basicBlockCount_; i++) {
 	rankLUT_[i] = rankCum;
 	rankCum += popcountLinear(bits_, 
 				  i * kWordCountPerBasicBlock, 
