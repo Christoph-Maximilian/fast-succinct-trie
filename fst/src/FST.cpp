@@ -559,6 +559,9 @@ inline uint64_t FST::childNodeNum(uint64_t pos) {
 // CHILD POS sparse
 //******************************************************
 inline uint64_t FST::childpos(uint64_t nodeNum) {
+    if (nodeNum - nodeCountU_ + 1 < 0) {
+        std::cout << "select of negative value: nodenum=" << nodeNum << "nodecountU=" << nodeCountU_ << std::endl;
+    }
     return sbits_->select(nodeNum - nodeCountU_ + 1);
 }
 
@@ -743,10 +746,13 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     // ******************************************************
 
     pos = (cutoff_level_ == 0) ? 0 : childpos(nodeNum);
-
+    uint64_t tmp_pos = pos;
     while (keypos < keylen) {
 
-
+        if (pos > 100000000000) {
+            std::cout << "ERROR current pos=" << pos << " previous pos=" << tmp_pos << " childcountU=" << childCountU_
+            << "keyposition=" << keypos << std::endl;
+        }
         kc = (uint8_t) key[keypos];
         int nsize = nodeSize(pos);
 
