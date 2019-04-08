@@ -769,6 +769,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
             return true;
         }
 
+        tmp_pos = pos;
         pos = childpos(childNodeNum(pos) + childCountU_);
         keypos++;
 
