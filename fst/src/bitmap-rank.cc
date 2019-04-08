@@ -29,22 +29,22 @@ Modified by Huanchen Zhang
 #include <iostream>
 
 // used for the LOWER level (sparse) of FST
-BitmapRankPoppy::BitmapRankPoppy(uint64_t *bits, uint32_t nbits) {
+BitmapRankPoppy::BitmapRankPoppy(uint64_t *bits, uint64_t nbits) {
     bits_ = bits;
     auto bit_length_64 = nbits % 64 == 0 ? nbits / 64 : nbits / 64 + 1;
     bitsVector.resize(bit_length_64);
     std::copy(bits, bits + bit_length_64, bitsVector.begin());
     nbits_ = nbits;
     basicBlockCount_ = nbits_ / kBasicBlockSize;
-    rankLUT_ = new uint32_t[basicBlockCount_];
-    rankLUTVector.resize(basicBlockCount_);
+    rankLUT_ = new uint64_t[basicBlockCount_];
+    //rankLUTVector.resize(basicBlockCount_);
 
     assert(posix_memalign((void **) &rankLUT_, kCacheLineSize, basicBlockCount_ * sizeof(uint32_t)) >= 0);
 
-    uint32_t rankCum = 0;
-    for (uint32_t i = 0; i < basicBlockCount_; i++) {
+    uint64_t rankCum = 0;
+    for (uint64_t i = 0; i < basicBlockCount_; i++) {
         rankLUT_[i] = rankCum;
-        rankLUTVector[i] = rankCum;
+        //rankLUTVector[i] = rankCum;
         rankCum += popcountLinear(bits_,
                                   i * kWordCountPerBasicBlock,
                                   kBasicBlockSize);
@@ -57,9 +57,9 @@ BitmapRankPoppy::BitmapRankPoppy(uint64_t *bits, uint32_t nbits) {
     mem_ = nbits / 8 + basicBlockCount_ * sizeof(uint32_t);
 }
 
-uint32_t BitmapRankPoppy::rank(uint32_t pos) {
+uint64_t BitmapRankPoppy::rank(uint64_t pos) {
     assert(pos <= nbits_);
-    uint32_t blockId = pos >> kBasicBlockBits;// == pos / 2^9 == pos / 512
+    uint64_t blockId = pos >> kBasicBlockBits;// == pos / 2^9 == pos / 512
     // which superblock? -> blockid << 3 == blockid * 8
     // which position within superblock? -> pos & 511 = 00000001|11111111_2
     return rankLUT_[blockId] + popcountLinear(bits_, (blockId << 3), (pos & 511));
@@ -70,10 +70,10 @@ uint64_t *BitmapRankPoppy::getBits() {
     return bits_;
 }
 
-uint32_t BitmapRankPoppy::getNbits() {
+uint64_t BitmapRankPoppy::getNbits() {
     return nbits_;
 }
 
-uint32_t BitmapRankPoppy::getMem() {
+uint64_t BitmapRankPoppy::getMem() {
     return mem_;
 }

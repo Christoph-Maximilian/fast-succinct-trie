@@ -12,7 +12,7 @@ inline void setBit(uint64_t &byte, int pos) {
     byte = byte | (MSB_MASK >> pos);
 }
 
-inline bool readBit(uint64_t &byte, int pos) {
+inline bool readBit(uint64_t &byte, uint64_t pos) {
     return byte & (MSB_MASK >> pos);
 }
 

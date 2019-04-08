@@ -67,7 +67,7 @@ private:
     uint64_t  nbits_;
     uint64_t  mem_;
 
-    uint32_t* rankLUT_;
+    uint64_t* rankLUT_;
     uint64_t  basicBlockCount_;
 };
 

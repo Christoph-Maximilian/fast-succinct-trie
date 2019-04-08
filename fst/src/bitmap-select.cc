@@ -28,17 +28,17 @@ Modified by Huanchen Zhang
 
 #include <iostream>
 
-BitmapSelectPoppy::BitmapSelectPoppy(uint64_t *bits, uint32_t nbits)
+BitmapSelectPoppy::BitmapSelectPoppy(uint64_t *bits, uint64_t nbits)
 {
     bits_ = bits;
     nbits_ = nbits;
 
-    uint32_t wordCount_ = nbits_ / kWordSize;
+    uint64_t wordCount_ = nbits_ / kWordSize;
 
-    uint32_t* rankLUT = new uint32_t[wordCount_ + 1];
+    auto* rankLUT = new uint64_t[wordCount_ + 1];
     assert(posix_memalign((void **) &rankLUT, kCacheLineSize, (wordCount_ + 1) * sizeof(uint32_t)) >= 0);
 
-    uint32_t rankCum = 0;
+    uint64_t rankCum = 0;
     for (uint32_t i = 0; i < wordCount_; i++) {
 	rankLUT[i] = rankCum;
 	rankCum += popcount(bits_[i]);
@@ -48,12 +48,12 @@ BitmapSelectPoppy::BitmapSelectPoppy(uint64_t *bits, uint32_t nbits)
 
     selectLUTCount_ = pCount_ / skip + 1;
     assert(posix_memalign((void **) &selectLUT_, kCacheLineSize, (selectLUTCount_ + 1) * sizeof(uint32_t)) >= 0);
-    selectLUT_ = new uint32_t[selectLUTCount_ + 1];
+    selectLUT_ = new uint64_t[selectLUTCount_ + 1];
     selectLUT_[0] = 0;
-    uint32_t idx = 1;
-    for (uint32_t i = 1; i <= wordCount_; i++) {
+    uint64_t idx = 1;
+    for (uint64_t i = 1; i <= wordCount_; i++) {
 	while (idx * skip <= rankLUT[i]) {
-	    int rankR = idx * skip - rankLUT[i-1];
+        int64_t rankR = idx * skip - rankLUT[i-1];
 	    selectLUT_[idx] = (i - 1) * kWordSize + select64_popcount_search(bits_[i-1], rankR) + 1;
 	    idx++;
 	}
@@ -64,11 +64,11 @@ BitmapSelectPoppy::BitmapSelectPoppy(uint64_t *bits, uint32_t nbits)
     mem_ = nbits_ / 8 + (selectLUTCount_ + 1) * sizeof(uint32_t);
 }
 
-uint32_t BitmapSelectPoppy::select(uint32_t rank) {
+uint64_t BitmapSelectPoppy::select(uint64_t rank) {
     assert(rank <= pCount_);
 
-    uint32_t s = selectLUT_[rank >> kSkipBits];
-    uint32_t rankR = rank & kSkipMask;
+    uint64_t s = selectLUT_[rank >> kSkipBits];
+    uint64_t rankR = rank & kSkipMask;
 
     if (rankR == 0)
 	return s - 1;
@@ -91,10 +91,10 @@ uint64_t* BitmapSelectPoppy::getBits() {
     return bits_;
 }
 
-uint32_t BitmapSelectPoppy::getNbits() {
+uint64_t BitmapSelectPoppy::getNbits() {
     return nbits_;
 }
 
-uint32_t BitmapSelectPoppy::getMem() {
+uint64_t BitmapSelectPoppy::getMem() {
     return mem_;
 }
