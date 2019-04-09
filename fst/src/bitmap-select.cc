@@ -73,8 +73,8 @@ uint64_t BitmapSelectPoppy::select(uint64_t rank) {
     if (rankR == 0)
 	return s - 1;
 
-    int idx = s >> kWordBits;
-    int startWordBit = s & kWordMask;
+    uint64_t idx = s >> kWordBits;
+    uint64_t startWordBit = s & kWordMask;
     uint64_t word = bits_[idx] << startWordBit >> startWordBit;
 
     int pop = 0;

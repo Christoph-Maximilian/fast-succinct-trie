@@ -770,6 +770,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         }
 
         tmp_pos = pos;
+        // TODO WHERE IS THE SIGSEGV REASON
         pos = childpos(childNodeNum(pos) + childCountU_);
         keypos++;
 
