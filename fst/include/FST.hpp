@@ -108,7 +108,6 @@ private:
 
     uint8_t* cbytes_;
     BitmapRankPoppy* tbits_;
-    BitmapRankPoppy* vbits_;
     BitmapSelectPoppy* sbits_;
     uint64_t* values_;
 
