@@ -11,15 +11,18 @@ FST::FST(int cutoff_level) : cutoff_level_(cutoff_level), nodeCountU_(0), childC
                              c_mem_(0), t_mem_(0), s_mem_(0), val_mem_(0), num_t_(0), number_values(0) {}
 
 FST::~FST() {
-    if (cbitsU_) delete cbitsU_;
-    if (tbitsU_) delete tbitsU_;
-    if (obitsU_) delete obitsU_;
-    if (valuesU_) delete valuesU_;
+    delete cbitsU_;
+    delete tbitsU_;
+    delete obitsU_;
+    delete valuesU_;
 
-    if (cbytes_) delete cbytes_;
-    if (tbits_) delete tbits_;
-    if (sbits_) delete sbits_;
-    if (values_) delete values_;
+    delete cbytes_;
+    delete tbits_;
+    delete sbits_;
+    delete values_;
+
+    delete[] vbitsU_->rankLUT_;
+
 }
 
 //stat
@@ -349,7 +352,6 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         }
     }
 
-    assert (t_bitPosU < c_bitPosU);
     u_int64_t t_sizeU = (c_lenU_ / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
     tbitsU_ = new BitmapRankFPoppy(tbitsU, t_sizeU * 64);
     t_memU_ = tbitsU_->getNbits() / 8; //stat

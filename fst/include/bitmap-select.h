@@ -49,7 +49,10 @@ public:
 class BitmapSelectPoppy: public BitmapSelect {
 public:
     BitmapSelectPoppy(uint64_t* bits, uint64_t nbits);
-    ~BitmapSelectPoppy() {}
+    ~BitmapSelectPoppy() {
+        delete[] bits_;
+        delete[] selectLUT_;
+    }
 
     uint64_t select(uint64_t rank);
 

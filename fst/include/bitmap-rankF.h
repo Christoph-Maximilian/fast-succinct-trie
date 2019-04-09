@@ -51,7 +51,10 @@ protected:
 class BitmapRankFPoppy: public BitmapRankF {
 public:
     BitmapRankFPoppy(uint64_t* bits, uint64_t nbits);
-    ~BitmapRankFPoppy() {}
+    ~BitmapRankFPoppy() {
+        delete[] bits_;
+        delete[] rankLUT_;
+    }
 
     uint64_t rank(uint64_t pos);
 
