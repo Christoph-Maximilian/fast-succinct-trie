@@ -534,13 +534,42 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     sbits_ = new BitmapSelectPoppy(sbits, s_mem_ * 64);
     s_mem_ = sbits_->getMem(); //stat
 
+    // TODO values sparse encoded
     uint64_t val_pos = 0;
-    for (int i = cutoff_level_; i < (int) val.size(); i++) {
-        for (int j = 0; j < (int) val[i].size(); j++) {
-            values_[val_pos] = val[i][j];
+    uint64_t bit_value_pos = 0;
+    last_value = 0;
+    vbitsL_bits.resize(val_mem_ / sizeof(uint64_t) + 1, 0);
+
+
+    for (uint32_t i = cutoff_level_; i < val.size(); i++) {
+        for (uint32_t j = 0; j < val[i].size(); j++) {
+            if (val_pos == 0) {
+                values_L_succinct.push_back(val[i][j]);
+                last_value = val[i][j];
+
+            } else {
+                if (val[i][j] == last_value) {
+                    // do not save this value -> 0 in bitmap - do nothing
+
+                } else {
+                    // save this value -> 1 in bitmap
+                    values_L_succinct.push_back(val[i][j]);
+                    last_value = val[i][j];
+                    setBit(vbitsL_bits[bit_value_pos / 64], bit_value_pos % 64);
+
+                }
+            }
             val_pos++;
+            bit_value_pos++;
         }
     }
+
+    u_int64_t v_size = (bit_value_pos / 64 / 32 + 1) * 32;
+    vbitsL_bits.resize(v_size, 0); // rest gets filled with zeros
+    vbits_ = new BitmapRankPoppy(vbitsL_bits.data(), v_size * 64);
+
+    val_mem_ = static_cast<uint32_t >(values_L_succinct.size() * 8 + vbits_->getNbits() / 8);
+
     //-------------------------------------------------
     //node counts per level
     nc_ = nc;
@@ -621,7 +650,7 @@ inline uint64_t FST::valuePosU(uint64_t nodeNum, uint64_t pos) {
 // GET VALUE POS sparse
 //******************************************************
 inline uint64_t FST::valuePos(uint64_t pos) {
-    return pos - tbits_->rank(pos + 1);
+    return vbits_->rank(pos - tbits_->rank(pos + 1) + 1);
 }
 
 //******************************************************
@@ -890,7 +919,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
             // in this case the last one is not the last flag but a legal 1
             if (!isTbitSet(pos)) {
                 //todo careful - we read out of bitvector here
-                value = values_[valuePos(pos)];
+                value = values_L_succinct[valuePos(pos)];
                 return true;
             }
             return false;
@@ -899,7 +928,10 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         if (!isTbitSet(pos)) {
             //todo careful - we read out of bitvector here
 
-            value = values_[valuePos(pos)];
+            //uint64_t value_index = valuePos(pos);
+            //assert(value_index < number_values);
+            value = values_L_succinct[valuePos(pos)];
+
             return true;
         }
 
@@ -913,8 +945,10 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
     //TODO: this is the important part -> here we detect that , added by @Christoph
     if (!isTbitSet(pos)) {
-        uint64_t value_index = valuePos(pos);
-        value = values_[value_index];
+
+        //uint64_t value_index = valuePos(pos);
+        //assert(value_index < number_values);
+        value = values_L_succinct[valuePos(pos)];
         return true;
     }
     return false;
