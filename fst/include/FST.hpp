@@ -111,6 +111,8 @@ private:
     BitmapRankPoppy* vbits_;
     BitmapSelectPoppy* sbits_;
     uint64_t* values_;
+    vector<uint64_t > vbitsL_bits;
+    vector<uint64_t > values_L_succinct;
 
     //stats
     uint32_t tree_height_;
