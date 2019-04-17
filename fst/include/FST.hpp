@@ -44,8 +44,10 @@ public:
     uint32_t valueMemU();
 
     uint64_t cMem();
+    uint32_t eMemU();
     uint32_t tMem();
     uint32_t sMem();
+    uint32_t eMem();
     uint64_t keyMem();
     uint64_t valueMem();
     uint64_t number_values;
@@ -61,14 +63,17 @@ public:
     void print_csv();
 
 private:
-    inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos, uint32_t &nc);
-    inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos, uint32_t &nc);
+    inline bool insertChar_cond(uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, vector<uint64_t> &e, uint32_t &pos, uint32_t &nc, bool set_e_bit);
+    inline bool insertChar(uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, vector<uint64_t> &e, uint32_t &pos, uint32_t &nc, bool set_e_bit);
 
     inline bool isCbitSetU(uint64_t nodeNum, uint8_t kc);
     inline bool isTbitSetU(uint64_t nodeNum, uint8_t kc);
     inline bool isObitSetU(uint64_t nodeNum);
+    inline bool isEbitSetU(uint64_t nodeNum, uint8_t kc);
+
     inline bool isSbitSet(uint64_t pos);
     inline bool isTbitSet(uint64_t pos);
+    inline bool isEbitSet(uint64_t pos);
     inline uint64_t valuePosU(uint64_t nodeNum, uint64_t pos);
     inline uint64_t valuePos(uint64_t pos);
 
@@ -107,12 +112,14 @@ private:
     BitmapRankPoppy* tbits_;
     BitmapSelectPoppy* sbits_;
     uint64_t* values_;
-
+    uint64_t *ebits_;
+    uint64_t *ebitsU_;
     //stats
     uint32_t tree_height_;
     int32_t last_value_pos_; // negative means in valuesU_
 
     uint32_t c_lenU_;
+    uint32_t emem_U;
     uint32_t o_lenU_;
 
     uint32_t c_memU_;
@@ -123,8 +130,10 @@ private:
     uint64_t c_mem_;
     uint64_t t_mem_;
     uint64_t s_mem_;
+    uint64_t e_mem_;
     uint64_t val_mem_;
 
+    uint32_t number_ebits_set_in_insert_char;
     uint32_t num_t_;
 
     friend class FSTIter;
