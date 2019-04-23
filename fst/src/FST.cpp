@@ -138,6 +138,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     std::cout << "width of codes: " << log2(sequenced_tas.size()) + 1 << std::endl;
     std::cout << "number of different tas: " << sequenced_tas.size() << std::endl;
     upper_values.width(static_cast<uint8_t>(log2(sequenced_tas.size()) + 1));
+    lower_values.width(static_cast<uint8_t>(log2(sequenced_tas.size()) + 1));
 
     for (uint64_t i = 0; i < sequenced_tas.size(); i++) {
         ta_to_code.insert(std::make_pair(sequenced_tas[i], i));
@@ -420,8 +421,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     u_int64_t v_sizeU = (bit_value_posU / 64 / 32 + 1) * 32;
     vbitsU_bits.resize(v_sizeU, 0);
     vbitsU_ = new BitmapRankFPoppy(vbitsU_bits.data(), v_sizeU * 64);
-
-    val_memU_ = static_cast<uint32_t >(values_U_succinct.size() * 8 + vbitsU_->getNbits() / 8);
+    val_memU_ = static_cast<uint32_t >((upper_values.size() * upper_values.width() + 63) / 8 + vbitsU_->getNbits() / 8);
 
     //-------------------------------------------------
     for (int i = cutoff_level_; i < (int) c.size(); i++)
@@ -534,7 +534,12 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     vbitsL_bits.resize(v_size, 0); // rest gets filled with zeros
     vbits_ = new BitmapRankPoppy(vbitsL_bits.data(), v_size * 64);
 
-    val_mem_ = static_cast<uint32_t >(values_L_succinct.size() * 8 + vbits_->getNbits() / 8);
+    lower_values.resize(values_L_succinct.size());
+    for (auto i = 0; i < values_L_succinct.size(); i++) {
+      lower_values[i] = ta_to_code[values_L_succinct[i]];
+    }
+
+    val_mem_ = static_cast<uint32_t >(lower_values.bit_size() / 8 + vbits_->getNbits() / 8);
 
     //-------------------------------------------------
     //node counts per level
@@ -817,7 +822,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
             //todo careful - we read out of bitvector here
             //uint64_t value_index = valuePos(pos);
             //assert(value_index < number_values);
-            value = values_L_succinct[valuePos(pos)];
+            value = sequenced_tas[lower_values[valuePos(pos)]];
 
             return true;
         }
@@ -834,7 +839,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     if (!isTbitSet(pos)) {
         //uint64_t value_index = valuePos(pos);
         //assert(value_index < number_values);
-        value = values_L_succinct[valuePos(pos)];
+        value = sequenced_tas[lower_values[valuePos(pos)]];
         return true;
     }
     return false;

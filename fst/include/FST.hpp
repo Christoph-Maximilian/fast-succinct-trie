@@ -119,8 +119,10 @@ private:
     uint64_t* values_;
     vector<uint64_t > vbitsL_bits;
     vector<uint64_t > values_L_succinct;
+  sdsl::int_vector<0> lower_values;
 
-    //stats
+
+  //stats
     uint32_t tree_height_;
     int32_t last_value_pos_; // negative means in valuesU_
 
