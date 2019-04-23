@@ -133,6 +133,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     std::cout << "width of codes: " << log2(sequenced_tas.size()) + 1 << std::endl;
     std::cout << "number of different tas: " << sequenced_tas.size() << std::endl;
     upper_values.width(static_cast<uint8_t>(log2(sequenced_tas.size()) + 1));
+    lower_values.width(static_cast<uint8_t>(log2(sequenced_tas.size()) + 1));
 
     for (uint64_t i = 0; i < sequenced_tas.size(); i++) {
         ta_to_code.insert(std::make_pair(sequenced_tas[i], i));
@@ -449,6 +450,15 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
             val_pos++;
         }
     }
+
+    lower_values.resize(val_pos);
+    for (auto i = 0; i < val_pos; i++) {
+      lower_values[i] = ta_to_code[values_[i]];
+    }
+
+    val_mem_ = static_cast<uint32_t >(lower_values.bit_size() / 8 );
+
+
     //-------------------------------------------------
     //node counts per level
     nc_ = nc;
@@ -726,7 +736,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
             // in this case the last one is not the last flag but a legal 1
             if (!isTbitSetU(nodeNum, kc)) {
                 //Christoph: i think this returns if the current prefix ends
-                value = valuesU_[valuePosU(nodeNum, pos)];
+                value = sequenced_tas[upper_values[valuePosU(nodeNum, pos)]];
                 return true;
             }
             return false;
@@ -793,10 +803,11 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         }
 
         if (!isTbitSet(pos)) {
-            //todo careful - we read out of bitvector here
-            uint64_t value_index = valuePos(pos);
-            assert(value_index < number_values);
-            value = values_[valuePos(pos)];
+
+            //uint64_t value_index = valuePos(pos);
+            //assert(value_index < number_values);
+            value = sequenced_tas[lower_values[valuePos(pos)]];
+
             return true;
         }
 
@@ -810,9 +821,8 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
 
     //TODO: this is the important part -> here we detect that , added by @Christoph
     if (!isTbitSet(pos)) {
-        uint64_t value_index = valuePos(pos);
-        assert(value_index < number_values);
-        value = values_[value_index];
+
+        value = sequenced_tas[lower_values[valuePos(pos)]];
         return true;
     }
     return false;
