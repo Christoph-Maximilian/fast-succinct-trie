@@ -118,9 +118,15 @@ private:
     BitmapRankPoppy* tbits_;
     BitmapSelectPoppy* sbits_;
     uint64_t* values_;
+
     uint64_t *ebits_;
     uint64_t *ebitsU_;
     //stats
+
+    sdsl::int_vector<0> lower_values;
+
+  //stats
+
     uint32_t tree_height_;
     int32_t last_value_pos_; // negative means in valuesU_
 
