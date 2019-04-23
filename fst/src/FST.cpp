@@ -2,6 +2,10 @@
 #include <bitset>
 #include <fstream>
 #include <sstream>
+#include <sdsl/bit_vectors.hpp>
+#include <unordered_set>
+#include <unordered_map>
+#include <cmath>
 
 FST::FST(int cutoff_level) : cutoff_level_(cutoff_level), nodeCountU_(0), childCountU_(0),
                              cbitsU_(nullptr), tbitsU_(nullptr), obitsU_(nullptr), valuesU_(nullptr),
@@ -31,7 +35,7 @@ uint32_t FST::oMemU() { return o_memU_; }
 
 uint32_t FST::keyMemU() { return (c_memU_ + t_memU_ + o_memU_); }
 
-uint32_t FST::valueMemU() { return static_cast<uint32_t >(values_U_succinct.size() * 8); }
+uint32_t FST::valueMemU() { return static_cast<uint32_t >((upper_values.size() * upper_values.width() + 63) / 8); }
 
 uint64_t FST::cMem() { return c_mem_; }
 
@@ -43,7 +47,7 @@ uint64_t FST::keyMem() { return (c_mem_ + t_mem_ + s_mem_); }
 
 uint64_t FST::valueMem() { return val_mem_; }
 
-uint64_t FST::mem() { return (c_memU_ + t_memU_ + o_memU_ + val_memU_ + c_mem_ + t_mem_ + s_mem_ + val_mem_); }
+uint64_t FST::mem() { return (c_memU_ + t_memU_ + o_memU_ + valueMemU() + c_mem_ + t_mem_ + s_mem_ + val_mem_); }
 
 uint32_t FST::numT() { return num_t_; }
 
@@ -124,6 +128,22 @@ std::string FST::export_stats() {
 uint8_t denorm_levels[4] = {1, 4, 16, 64};
 
 void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLen) {
+    //region code for values to encode them space efficient in a bitvector
+    unordered_set<uint64_t> ta;
+    for (auto& v : values) {
+        ta.insert(v);
+    }
+    std::copy(ta.begin(), ta.end(), std::back_inserter(sequenced_tas));
+
+    std::cout << "width of codes: " << log2(sequenced_tas.size()) + 1 << std::endl;
+    std::cout << "number of different tas: " << sequenced_tas.size() << std::endl;
+    upper_values.width(static_cast<uint8_t>(log2(sequenced_tas.size()) + 1));
+
+    for (uint64_t i = 0; i < sequenced_tas.size(); i++) {
+        ta_to_code.insert(std::make_pair(sequenced_tas[i], i));
+    }
+    //endregion
+
     tree_height_ = static_cast<uint32_t >(longestKeyLen);
     vector<vector<uint8_t> > c;
     vector<vector<uint64_t> > t;
@@ -372,6 +392,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     for (u_int32_t i = 0; i < cutoff_level_; i++) {
         for (u_int32_t j = 0; j < (u_int32_t) val[i].size(); j++) {
             if (val_posU == 0) {
+
                 values_U_succinct.push_back(val[i][j]);
                 last_value = val[i][j];
 
@@ -390,6 +411,10 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
             val_posU++;
             bit_value_posU++;
         }
+    }
+    upper_values.resize(values_U_succinct.size());
+    for (auto i = 0; i < values_U_succinct.size(); i++) {
+        upper_values[i] = ta_to_code[values_U_succinct[i]];
     }
 
     u_int64_t v_sizeU = (bit_value_posU / 64 / 32 + 1) * 32;
@@ -735,7 +760,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         }
         if (!isTbitSetU(nodeNum, kc)) {
             // this returns true if there is no child -> value can be found
-            value = values_U_succinct[valuePosU(nodeNum, pos)];
+            value = sequenced_tas[upper_values[valuePosU(nodeNum, pos)]];
             return true;
         }
 
