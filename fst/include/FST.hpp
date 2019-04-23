@@ -10,6 +10,8 @@
 #include "./bitmap-rank.h"
 #include "./bitmap-rankF.h"
 #include "./bitmap-select.h"
+#include <sdsl/bit_vectors.hpp>
+#include <unordered_map>
 
 using namespace std;
 
@@ -94,6 +96,9 @@ private:
     inline bool nextNodeU(int keypos, uint64_t nodeNum, FSTIter* iter);
     inline bool nextNode(int keypos, uint64_t pos, FSTIter* iter);
 
+    std::unordered_map<uint64_t, uint64_t> ta_to_code;
+    std::vector<uint64_t> sequenced_tas;
+
     int cutoff_level_;
     uint64_t nodeCountU_;
     uint64_t childCountU_;
@@ -102,6 +107,7 @@ private:
     BitmapRankFPoppy* tbitsU_;
     BitmapRankFPoppy* obitsU_;
     uint64_t* valuesU_;
+    sdsl::int_vector<0> upper_values;
 
     uint8_t* cbytes_;
     BitmapRankPoppy* tbits_;
