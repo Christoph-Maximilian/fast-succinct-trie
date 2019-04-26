@@ -12,7 +12,7 @@ FST::FST(int cutoff_level) : cutoff_level_(cutoff_level), nodeCountU_(0), childC
                              cbytes_(nullptr), tbits_(nullptr), sbits_(nullptr), values_(nullptr),
                              tree_height_(0), last_value_pos_(0),
                              c_lenU_(0), o_lenU_(0), c_memU_(0), t_memU_(0), o_memU_(0), val_memU_(0),
-                             c_mem_(0), t_mem_(0), s_mem_(0), val_mem_(0), num_t_(0), number_values(0) {}
+                             c_mem_(0), t_mem_(0), s_mem_(0), val_mem_(0), num_t_(0), number_values(0), length(-1) {}
 
 FST::~FST() {
     delete cbitsU_;
@@ -135,8 +135,8 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     }
     std::copy(ta.begin(), ta.end(), std::back_inserter(sequenced_tas));
 
-    std::cout << "width of codes: " << log2(sequenced_tas.size()) + 1 << std::endl;
-    std::cout << "number of different tas: " << sequenced_tas.size() << std::endl;
+    //std::cout << "width of codes: " << log2(sequenced_tas.size()) + 1 << std::endl;
+    //std::cout << "number of different tas: " << sequenced_tas.size() << std::endl;
     upper_values.width(static_cast<uint8_t>(log2(sequenced_tas.size()) + 1));
 
     for (uint64_t i = 0; i < sequenced_tas.size(); i++) {
@@ -248,7 +248,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     for (int i = 0; i < (int) nc.size(); i++)
         nc_total += nc[i];
 
-    cout << "cutoff_level_ = " << cutoff_level_ << "\n";
+    //  cout << "cutoff_level_ = " << cutoff_level_ << "\n";
 
     // determine the position of the last value for range query boundary check
     if (last_value_level < cutoff_level_) {
@@ -352,7 +352,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         }
     }
 
-    u_int64_t c_sizeU = (c_lenU_ / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
+    u_int64_t c_sizeU = c_lenU_;//(c_lenU_ / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
     cbitsU_ = new BitmapRankFPoppy(cbitsU, c_sizeU * 64);
     c_memU_ = cbitsU_->getNbits() / 8; //stat
 
@@ -367,7 +367,8 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         }
     }
 
-    u_int64_t t_sizeU = (c_lenU_ / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
+    // TODO too big block size leads to sigsegvs
+    u_int64_t t_sizeU = c_lenU_;//(c_lenU_ / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
     tbitsU_ = new BitmapRankFPoppy(tbitsU, t_sizeU * 64);
     t_memU_ = tbitsU_->getNbits() / 8; //stat
 
@@ -748,6 +749,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
     //******************************************************
     // SEARCH IN DENSE NODES
     // ******************************************************
+
     while (keypos < keylen && keypos < cutoff_level_) {
         kc = (uint8_t) key[keypos];
         pos = (nodeNum << 8) + kc;
@@ -1183,6 +1185,22 @@ std::vector<std::vector<std::string>> FST::printL() {
     }
     std::vector<std::vector<std::string>> result = {c_bytes, t_bits, s_bits, values};
     return result;
+}
+
+//******************************************************
+// HYBRID TRIE
+//******************************************************
+void FST::add(vector<uint8_t> keys, uint64_t value, int length){
+  this->keys.insert(this->keys.end(), keys.begin(), keys.end());
+  this->values.emplace_back(value);
+  if (length > this->length) {
+      this->length = length;
+  }
+}
+
+void FST::load(){
+    this->cutoff_level_ = length;
+    this->load(keys, values, length);
 }
 
 

@@ -1,3 +1,6 @@
+#ifndef FST_H
+#define FST_H
+
 #include <stdint.h>
 #include <emmintrin.h>
 
@@ -25,6 +28,10 @@ public:
 
     FST(int cutoff_level);
     virtual ~FST();
+
+    // for hybrid trie (ACT-FST)
+    void add(vector<uint8_t> keys, uint64_t value, int length);
+    void load();
 
     void load(vector<uint8_t > &keys, vector<uint64_t> &values, int longestKeyLen);
     void load(vector<uint64_t> &keys, vector<uint64_t> &values);
@@ -63,6 +70,10 @@ public:
     void print_csv();
 
 private:
+    vector<uint8_t> keys;
+    vector<uint64_t> values;
+    int length;
+
     inline bool insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos, uint32_t &nc);
     inline bool insertChar(const uint8_t ch, bool isTerm, vector<uint8_t> &c, vector<uint64_t> &t, vector<uint64_t> &s, uint32_t &pos, uint32_t &nc, bool set_SBit);
 
@@ -179,3 +190,4 @@ private:
     friend class FST;
 };
 
+#endif

@@ -34,7 +34,7 @@ BitmapRankFPoppy::BitmapRankFPoppy(uint64_t *bits, uint64_t nbits)
     bits_ = bits;
     nbits_ = nbits;
     basicBlockCount_ = nbits_ / kBasicBlockSize;
-    rankLUT_ = new uint32_t[basicBlockCount_];
+    rankLUT_ = new uint32_t[basicBlockCount_ + 1];
     assert(posix_memalign((void **) &rankLUT_, kCacheLineSize, basicBlockCount_ * sizeof(uint32_t)) >= 0);
 
     uint32_t rankCum = 0;
@@ -44,7 +44,7 @@ BitmapRankFPoppy::BitmapRankFPoppy(uint64_t *bits, uint64_t nbits)
 				  i * kWordCountPerBasicBlock, 
 				  kBasicBlockSize);
     }
-    rankLUT_[basicBlockCount_-1] = rankCum;
+    rankLUT_[basicBlockCount_] = rankCum;
 
     pCount_ = rankCum;
     mem_ = nbits / 8 + basicBlockCount_ * sizeof(uint32_t);
@@ -52,7 +52,7 @@ BitmapRankFPoppy::BitmapRankFPoppy(uint64_t *bits, uint64_t nbits)
 
 uint64_t BitmapRankFPoppy::rank(uint64_t pos)
 {
-    assert(pos <= nbits_);
+    assert(pos <= nbits_ << kBasicBlockBits);
     uint64_t blockId = pos >> kBasicBlockBits;
     auto offset = static_cast<uint32_t > (pos & (uint32_t)63);
     if (offset)
