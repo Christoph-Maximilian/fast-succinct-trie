@@ -31,7 +31,7 @@ public:
 
     // for hybrid trie (ACT-FST)
     void add(vector<uint8_t> keys, uint64_t value, int length);
-    void load();
+    void load(std::vector<uint64_t>* sequenced_tas,std::unordered_map<uint64_t, uint64_t> *ta_to_codes);
 
     void load(vector<uint8_t > &keys, vector<uint64_t> &values, int longestKeyLen);
     void load(vector<uint64_t> &keys, vector<uint64_t> &values);
@@ -107,8 +107,8 @@ private:
     inline bool nextNodeU(int keypos, uint64_t nodeNum, FSTIter* iter);
     inline bool nextNode(int keypos, uint64_t pos, FSTIter* iter);
 
-    std::unordered_map<uint64_t, uint64_t> ta_to_code;
-    std::vector<uint64_t> sequenced_tas;
+    std::unordered_map<uint64_t, uint64_t>* ta_to_code;
+    std::vector<uint64_t>* sequenced_tas;
 
     int cutoff_level_;
     uint64_t nodeCountU_;

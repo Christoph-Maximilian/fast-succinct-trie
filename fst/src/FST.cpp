@@ -128,22 +128,8 @@ std::string FST::export_stats() {
 uint8_t denorm_levels[4] = {1, 4, 16, 64};
 
 void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLen) {
-    //region code for values to encode them space efficient in a bitvector
-    unordered_set<uint64_t> ta;
-    for (auto& v : values) {
-        ta.insert(v);
-    }
-    std::copy(ta.begin(), ta.end(), std::back_inserter(sequenced_tas));
 
-    //std::cout << "width of codes: " << log2(sequenced_tas.size()) + 1 << std::endl;
-    //std::cout << "number of different tas: " << sequenced_tas.size() << std::endl;
-    upper_values.width(static_cast<uint8_t>(log2(sequenced_tas.size()) + 1));
-
-    for (uint64_t i = 0; i < sequenced_tas.size(); i++) {
-        ta_to_code.insert(std::make_pair(sequenced_tas[i], i));
-    }
-    //endregion
-
+    upper_values.width(static_cast<uint8_t>(log2(sequenced_tas->size()) + 1));
     tree_height_ = static_cast<uint32_t >(longestKeyLen);
     vector<vector<uint8_t> > c;
     vector<vector<uint64_t> > t;
@@ -415,7 +401,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     }
     upper_values.resize(values_U_succinct.size());
     for (auto i = 0; i < values_U_succinct.size(); i++) {
-        upper_values[i] = ta_to_code[values_U_succinct[i]];
+        upper_values[i] = (*ta_to_code)[values_U_succinct[i]];
     }
 
     u_int64_t v_sizeU = (bit_value_posU / 64 / 32 + 1) * 32;
@@ -762,7 +748,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
         }
         if (!isTbitSetU(nodeNum, kc)) {
             // this returns true if there is no child -> value can be found
-            value = sequenced_tas[upper_values[valuePosU(nodeNum, pos)]];
+            value = (*sequenced_tas)[upper_values[valuePosU(nodeNum, pos)]];
             return true;
         }
 
@@ -1198,7 +1184,9 @@ void FST::add(vector<uint8_t> keys, uint64_t value, int length){
   }
 }
 
-void FST::load(){
+void FST::load(std::vector<uint64_t>* sequenced_tas,std::unordered_map<uint64_t, uint64_t> *ta_to_codes){
+    this->sequenced_tas = sequenced_tas;
+    this->ta_to_code = ta_to_codes;
     this->cutoff_level_ = length;
     this->load(keys, values, length);
 }
