@@ -653,17 +653,51 @@ inline bool FST::nodeSearch_lowerBound(uint64_t &pos, int size, uint8_t target) 
 }
 
 
+uint8_t level_masks[4] = {0xFC, 0xF0, 0xC0, 0x00};
+uint8_t level_masks_last_flag[4] = {0x02, 0x08, 0x20, 0x80};
+
+//******************************************************
+//  HYBRID TRIE BUILD FUNCTIONS
+//******************************************************
+//Todo: so far, we support only densely encoded tries
+
+// returns the NUMBER of the first node at the given switch-level
+uint64_t FST::getFirstNodePositionOnLevel(const uint8_t *key, const int keylen, int level) {
+    assert(level < cutoff_level_);
+    assert(level < keylen);
+
+    int keypos = 0;
+    uint64_t nodeNum = 0;
+    uint8_t kc = (uint8_t) key[keypos];
+    uint64_t pos = kc;
+
+    //******************************************************
+    // SEARCH IN DENSE NODES
+    //******************************************************
+    while (keypos < keylen && keypos < level) {
+        kc = (uint8_t) key[keypos];
+        //Todo: Check if parent cell ids are in node - this pos calculation is
+        // important since kc is the key, e.g.'b'
+        pos = (nodeNum << 8) + kc;
+
+        __builtin_prefetch(tbitsU_->bits_ + (nodeNum << 2) + (kc >> 6), 0);
+        __builtin_prefetch(tbitsU_->rankLUT_ + ((pos + 1) >> 6), 0);
+
+        nodeNum = childNodeNumU(pos);
+        keypos++;
+    }
+    return nodeNum;
+}
+
+
 //******************************************************
 // LOOKUP
 //******************************************************
 
-uint8_t level_masks[4] = {0xFC, 0xF0, 0xC0, 0x00};
-uint8_t level_masks_last_flag[4] = {0x02, 0x08, 0x20, 0x80};
-
-bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value) {
+bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value, uint64_t nodeNum = 0) {
     int keypos = 0;
 
-    uint64_t nodeNum = 0;
+    //uint64_t nodeNum = 0;
     uint8_t kc = (uint8_t) key[keypos];
     uint64_t pos = kc;
 

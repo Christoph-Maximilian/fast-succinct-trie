@@ -27,8 +27,11 @@ public:
     void load(vector<uint8_t > &keys, vector<uint64_t> &values, int longestKeyLen);
     void load(vector<uint64_t> &keys, vector<uint64_t> &values);
 
-    bool lookup(const uint8_t* key, const int keylen, uint64_t &value);
+    bool lookup(const uint8_t* key, const int keylen, uint64_t &value, uint64_t nodeNum);
     bool lookup(const uint64_t key, uint64_t &value);
+
+    // to build hybrid trie
+    uint64_t getFirstNodePositionOnLevel(const uint8_t * key, const int keylen, int level);
 
     bool lowerBound(const uint8_t* key, const int keylen, FSTIter &iter);
     bool lowerBound(const uint64_t key, FSTIter &iter);
