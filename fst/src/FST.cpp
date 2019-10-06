@@ -674,7 +674,7 @@ uint64_t FST::getFirstNodePositionOnLevel(const uint8_t *key, const int keylen, 
     //******************************************************
     // SEARCH IN DENSE NODES
     //******************************************************
-    while (keypos < keylen && keypos < level) {
+    while (keypos < keylen && keypos <= level) {
         kc = (uint8_t) key[keypos];
         //Todo: Check if parent cell ids are in node - this pos calculation is
         // important since kc is the key, e.g.'b'
@@ -1090,7 +1090,7 @@ void FST::print_csv() {
     auto resultL = printL();
 
     std::ofstream out_file;
-    std::string out_file_name = "out/fst.csv";
+    std::string out_file_name = "fst.csv";
     out_file.open(out_file_name, std::ios::out | std::ios::app);
 
     auto upper_nodes_number(0);
@@ -1106,10 +1106,11 @@ void FST::print_csv() {
         for (int k = 0; k < resultU[i].size(); k++) {
             out_file << resultU[i][k] << ",";
         }
-        for (int k = 0; k < resultL[i].size() - 1; k++) {
-            out_file << resultL[i][k] << ",";
-        }
-        out_file << resultL[i][resultL[i].size() - 1] << std::endl;
+        //for (int k = 0; k < resultL[i].size() - 1; k++) {
+        //    out_file << resultL[i][k] << ",";
+        //}
+        //out_file << resultL[i][resultL[i].size() - 1] << std::endl;
+        out_file << std::endl;
     }
     out_file.close();
 }

@@ -1,6 +1,8 @@
+#ifndef FST_GATE
+#define FST_GATE
+
 #include <stdint.h>
 #include <emmintrin.h>
-
 #include <vector>
 #include <algorithm>
 #include <iostream>
@@ -172,3 +174,4 @@ private:
     friend class FST;
 };
 
+#endif
