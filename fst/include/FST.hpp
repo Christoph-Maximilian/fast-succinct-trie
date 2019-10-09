@@ -1,3 +1,5 @@
+#ifndef FST_H
+#define FST_H
 #include <stdint.h>
 #include <emmintrin.h>
 
@@ -27,7 +29,9 @@ public:
     void load(vector<uint8_t > &keys, vector<uint64_t> &values, int longestKeyLen);
     void load(vector<uint64_t> &keys, vector<uint64_t> &values);
 
-    bool lookup(const uint8_t* key, const int keylen, uint64_t &value);
+    uint64_t getFirstNodePositionOnLevel(const uint8_t *key, int keylen, int level);
+
+    bool lookup(const uint8_t* key, const int keylen, uint64_t &value, uint64_t nodeNum = 0);
     bool lookup(const uint64_t key, uint64_t &value);
 
     bool lowerBound(const uint8_t* key, const int keylen, FSTIter &iter);
@@ -169,3 +173,4 @@ private:
     friend class FST;
 };
 
+#endif
