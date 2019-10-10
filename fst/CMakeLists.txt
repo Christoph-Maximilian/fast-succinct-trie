@@ -4,11 +4,11 @@ project(fst)
 message(STATUS "Configuring..." ${CMAKE_PROJECT_NAME})
 
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g   -mpopcnt -pthread -std=c++14") #-Werror -O9
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g2   -mpopcnt -pthread -std=c++14") #-Werror -O9
 
 # TODO: remove those compile flask before benchmarking (those are for optimizing code - not good for debugging)
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} ")
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 
