@@ -31,6 +31,8 @@ public:
 
     uint64_t getFirstNodePositionOnLevel(const uint8_t *key, int keylen, int level);
 
+    void getNode(uint64_t nodeNum, vector<uint8_t> &labels, vector<bool> &hasChildNode, vector<uint64_t > nodeNumbersAndValues);
+
     bool lookup(const uint8_t* key, const int keylen, uint64_t &value, uint64_t nodeNum = 0);
     bool lookup(const uint64_t key, uint64_t &value);
 

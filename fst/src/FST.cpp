@@ -714,6 +714,36 @@ uint64_t FST::getFirstNodePositionOnLevel(const uint8_t *key, const int keylen, 
 }
 
 //******************************************************
+// COPY relevant information about DENSE node (Used for Succinct Hybrid Trie)
+//******************************************************
+
+void FST::getNode(uint64_t nodeNum, vector<uint8_t> &labels, vector<bool> &hasChildNode, vector<uint64_t > nodeNumbersAndValues) {
+    uint64_t pos;
+    // iterate through DENSE node and collect relevant information
+    for (uint8_t kc = 0; kc <= 255; kc++) {
+        pos = (nodeNum << 8) + kc;
+        if (isCbitSetU(nodeNum, kc)) { // is C-label set?
+            labels.push_back(kc);
+            if (isTbitSetU(nodeNum, kc)) {
+                // has a child node - store nodenumber of next child
+                hasChildNode.push_back(true);
+                uint64_t  childNodeNum = childNodeNumU(pos);
+                nodeNumbersAndValues.push_back(childNodeNum);
+            }
+            else {
+                // it stores a value, store it
+                hasChildNode.push_back(false);
+                uint64_t value = values_U_succinct[valuePosU(nodeNum, pos)];
+                nodeNumbersAndValues.push_back(value);
+            }
+        }
+    }
+
+
+}
+
+
+//******************************************************
 // LOOKUP
 //******************************************************
 
