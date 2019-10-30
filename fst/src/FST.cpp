@@ -749,10 +749,11 @@ uint64_t FST::getFirstNodePositionOnLevel(const uint8_t *key, const int keylen, 
 // COPY relevant information about DENSE node (Used for Succinct Hybrid Trie)
 //******************************************************
 
-void FST::getNode(uint64_t nodeNum, vector<uint8_t> &labels, vector<bool> &hasChildNode, vector<uint64_t > nodeNumbersAndValues) {
+void FST::getNode(uint64_t nodeNum, vector<uint8_t> &labels, vector<bool> &hasChildNode, vector<uint64_t > &nodeNumbersAndValues) {
     uint64_t pos;
     // iterate through DENSE node and collect relevant information
-    for (uint8_t kc = 0; kc <= 255; kc++) {
+    for (uint16_t i = 0; i <= 255; i++) {
+        uint8_t  kc = i;
         pos = (nodeNum << 8) + kc;
         if (isCbitSetU(nodeNum, kc)) { // is C-label set?
             labels.push_back(kc);
