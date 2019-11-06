@@ -734,7 +734,7 @@ void FST::getNode(uint64_t nodeNum, vector<uint8_t> &labels, vector<bool> &hasCh
             else {
                 // it stores a value, store it
                 hasChildNode.push_back(false);
-                uint64_t value = values_U_succinct[valuePosU(nodeNum, pos)];
+                uint64_t value = valuesU_[valuePosU(nodeNum, pos)];
                 nodeNumbersAndValues.push_back(value);
             }
         }
