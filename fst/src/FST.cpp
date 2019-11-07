@@ -137,6 +137,8 @@ uint8_t get_label(uint8_t byte, uint8_t level) {
 
 // longestKeyLen in number of bits
 void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLen) {
+    cutoff_level_ = longestKeyLen;
+
     tree_height_ = static_cast<uint32_t >(longestKeyLen);
     vector<vector<uint8_t> > c_labels;
     vector<vector<uint64_t> > t_hasChild;
@@ -188,7 +190,9 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         uint64_t value = values[value_index];
 
         int i = 0;
-        while (i < levels && !insertChar_cond(get_label((uint8_t) key[i/4], i % 4), c_labels[i], t_hasChild[i], s_node_boundary[i], pos_list[i], nc[i])) {
+        while (i < levels &&
+               !insertChar_cond(get_label((uint8_t) key[i / 4], i % 4), c_labels[i], t_hasChild[i], s_node_boundary[i],
+                                pos_list[i], nc[i])) {
             i++;
         }
 
@@ -211,7 +215,8 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
             while (i < cpl) {
                 i++;
                 if (i < cpl)
-                    insertChar(get_label((uint8_t) key[i/4], i % 4), i == cpl - 1, c_labels[i], t_hasChild[i], s_node_boundary[i], pos_list[i], nc[i], true);
+                    insertChar(get_label((uint8_t) key[i / 4], i % 4), i == cpl - 1, c_labels[i], t_hasChild[i],
+                               s_node_boundary[i], pos_list[i], nc[i], true);
             }
             //for (; index < end_index; index++) {
             //    key[number_common_cells] = keys[index];
@@ -220,7 +225,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
             //}
 
             // todo: save values more efficiently here
-            val[i].push_back(value);
+            val[i-1].push_back(value);
 
 
         } else
@@ -245,6 +250,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         }
     }
 #endif
+
     // put together
     int nc_total = 0;
     for (int i = 0; i < (int) nc.size(); i++)
@@ -266,12 +272,14 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     //-------------------------------------------------
     vector<vector<uint64_t> > cU;
     vector<vector<uint64_t> > tU;
+    // sbits are not needed for upper level since each node has exactly 4 bits
     vector<vector<uint8_t> > oU;
 
+    vector<uint64_t> number_nodes_level(cutoff_level_);
     for (int i = 0; i < cutoff_level_; i++) {
-        cU.push_back(vector<uint64_t>());
-        tU.push_back(vector<uint64_t>());
-        oU.push_back(vector<uint8_t>());
+        cU.emplace_back(vector<uint64_t>());
+        tU.emplace_back(vector<uint64_t>());
+        number_nodes_level[i] = 0;
     }
 
     for (int i = 0; i < cutoff_level_; i++) {
@@ -281,33 +289,31 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         uint8_t ch = 0;
         uint32_t j = 0;
         uint32_t k = 0;
+
         for (j = 0; j < (int) s_node_boundary[i].size(); j++) {
             if (sbitPos_i >= smaxPos_i) break;
-            for (k = 0; k < 64; k++) {
+            // todo append new uint64 for each 16 nodes -> setup counter
+            for (k = 0; k < 64; k++) { // s and t bits are stored in uint64_t
                 if (sbitPos_i >= smaxPos_i) break;
-
                 ch = c_labels[i][sbitPos_i];
                 if (readBit(s_node_boundary[i][j], k)) {
-                    for (int l = 0; l < 4; l++) {
+                    // we store up to 16 nodes per uint64 entry
+                    if (number_nodes_level[i] % 16 == 0) {
                         cU[i].push_back(0);
                         tU[i].push_back(0);
                     }
+                    number_nodes_level[i]++;
                     nodeCountU_++;
-                    // Todo this must be wrong?! we do not use terms -> add false for testing
-                    if (ch == TERM && false)
-                        oU[i].push_back(1);
-                    else {
-                        oU[i].push_back(0);
-                        setLabel((uint64_t *) cU[i].data() + cU[i].size() - 4, ch);
-                        if (readBit(t_hasChild[i][j], k)) {
-                            setLabel((uint64_t *) tU[i].data() + tU[i].size() - 4, ch);
-                            childCountU_++;
-                        }
+
+                    setLabel((uint64_t *) cU[i].data() + cU[i].size() - 1, ch + 4 * (number_nodes_level[i] - 1));
+                    if (readBit(t_hasChild[i][j], k)) {
+                        setLabel((uint64_t *) tU[i].data() + tU[i].size() - 1, ch + 4 * (number_nodes_level[i] - 1));
+                        childCountU_++;
                     }
                 } else {
-                    setLabel((uint64_t *) cU[i].data() + cU[i].size() - 4, ch);
+                    setLabel((uint64_t *) cU[i].data() + cU[i].size() - 1, ch + 4 * (number_nodes_level[i] - 1));
                     if (readBit(t_hasChild[i][j], k)) {
-                        setLabel((uint64_t *) tU[i].data() + tU[i].size() - 4, ch);
+                        setLabel((uint64_t *) tU[i].data() + tU[i].size() - 1, ch + 4 * (number_nodes_level[i] - 1));
                         childCountU_++;
                     }
                 }
@@ -316,17 +322,17 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         }
     }
 
-    o_lenU_ = 0;
+    // todo store number of nodes per level! -> compose it correctly later
     u_int64_t vallenU = 0;
     for (int i = 0; i < (int) cU.size(); i++) {
-        c_lenU_ += cU[i].size();
-        o_lenU_ += oU[i].size();
+        c_lenU_ += number_nodes_level[i];
         vallenU += val[i].size();
     }
 
-    uint64_t *cbitsU = new uint64_t[c_lenU_];
-    uint64_t *tbitsU = new uint64_t[c_lenU_];
-    uint64_t *obitsU = new uint64_t[o_lenU_ / 64 + 1];
+    c_lenU_ = (c_lenU_ + 15) / 16;
+    auto cbitsU = new uint64_t[c_lenU_];
+    auto tbitsU = new uint64_t[c_lenU_];
+
     valuesU_ = new uint64_t[vallenU];
 
     // init
@@ -334,15 +340,25 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         cbitsU[i] = 0;
         tbitsU[i] = 0;
     }
-    for (int i = 0; i < (o_lenU_ / 64 + 1); i++)
-        obitsU[i] = 0;
 
+    uint64_t overall_node_number = 0;
     uint64_t c_bitPosU = 0;
     for (u_int32_t i = 0; i < (u_int32_t) cU.size(); i++) {
+        uint64_t node_number_level = number_nodes_level[i];
         for (u_int32_t j = 0; j < (u_int32_t) cU[i].size(); j++) {
+
             for (u_int32_t k = 0; k < 64; k++) {
                 if (readBit(cU[i][j], k)) {
                     setBit(cbitsU[c_bitPosU / 64], c_bitPosU % 64);
+                    if (readBit(tU[i][j], k)) {
+                        setBit(tbitsU[c_bitPosU / 64], c_bitPosU % 64);
+                    }
+                }
+                if (k % 4 == 0) {
+                    if (node_number_level == 0) { break; }
+                    node_number_level--;
+                    overall_node_number++;
+
                 }
                 c_bitPosU++;
             }
@@ -353,33 +369,21 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     cbitsU_ = new BitmapRankFPoppy(cbitsU, c_sizeU * 64);
     c_memU_ = cbitsU_->getNbits() / 8; //stat
 
-    uint64_t t_bitPosU = 0;
-    for (u_int32_t i = 0; i < (u_int32_t) tU.size(); i++) {
-        for (u_int32_t j = 0; j < (u_int32_t) tU[i].size(); j++) {
-            for (u_int32_t k = 0; k < 64; k++) {
-                if (readBit(tU[i][j], k))
-                    setBit(tbitsU[t_bitPosU / 64], t_bitPosU % 64);
-                t_bitPosU++;
-            }
-        }
-    }
+    // todo we set the tbits above already
+    //uint64_t t_bitPosU = 0;
+    //for (u_int32_t i = 0; i < (u_int32_t) tU.size(); i++) {
+    //    for (u_int32_t j = 0; j < (u_int32_t) tU[i].size(); j++) {
+    //        for (u_int32_t k = 0; k < 64; k++) {
+    //            if (readBit(tU[i][j], k))
+    //                setBit(tbitsU[t_bitPosU / 64], t_bitPosU % 64);
+    //            t_bitPosU++;
+    //        }
+    //    }
+    //}
 
     u_int64_t t_sizeU = (c_lenU_ / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
     tbitsU_ = new BitmapRankFPoppy(tbitsU, t_sizeU * 64);
     t_memU_ = tbitsU_->getNbits() / 8; //stat
-
-    uint64_t o_bitPosU = 0;
-    for (int i = 0; i < (int) oU.size(); i++) {
-        for (int j = 0; j < (int) oU[i].size(); j++) {
-            if (oU[i][j] == 1)
-                setBit(obitsU[o_bitPosU / 64], o_bitPosU % 64);
-            o_bitPosU++;
-        }
-    }
-
-    u_int64_t o_sizeU = (o_lenU_ / 64 / 32 + 1) * 32; // round-up to 1024-bit block size for Poppy
-    obitsU_ = new BitmapRankFPoppy(obitsU, o_sizeU * 64);
-    o_memU_ = obitsU_->getNbits() / 8; //stat
 
     uint64_t val_posU = 0;
     for (u_int32_t i = 0; i < cutoff_level_; i++) {
