@@ -117,7 +117,7 @@ int loadPolygonIdsFile(vector<uint8_t> &keys, vector<uint64_t> &values, const st
         auto key_vector = cell_id_to_array(cell);
         std::copy(key_vector.begin(), key_vector.end(), std::back_inserter(keys));
         values.push_back(count);
-        if (cell_id.length() > longestKeyLen) { longestKeyLen = key_vector[0]; }
+        if (key_vector[0] > longestKeyLen) { longestKeyLen = key_vector[0]; }
         count++;
     }
     return longestKeyLen;

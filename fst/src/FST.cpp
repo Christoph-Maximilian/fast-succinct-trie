@@ -3,6 +3,9 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
+#include <bitset>
+
+#define DEBUG_BITSETS
 
 FST::FST(int cutoff_level) : cutoff_level_(cutoff_level), nodeCountU_(0), childCountU_(0),
                              cbitsU_(nullptr), tbitsU_(nullptr), obitsU_(nullptr), valuesU_(nullptr),
@@ -55,6 +58,7 @@ FST::insertChar_cond(const uint8_t ch, vector<uint8_t> &c, vector<uint64_t> &t, 
                      uint32_t &nc) {
     if (c.empty() || c.back() != ch) {
         c.push_back(ch);
+        // Todo set node boundaries correct for 4 bit nodes
         if (c.size() == 1) {
             setBit(s.back(), pos % 64);
             nc++;
@@ -134,10 +138,14 @@ uint8_t get_label(uint8_t byte, uint8_t level) {
 // longestKeyLen in number of bits
 void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLen) {
     tree_height_ = static_cast<uint32_t >(longestKeyLen);
-    vector<vector<uint8_t> > c;
-    vector<vector<uint64_t> > t;
-    vector<vector<uint64_t> > s;
+    vector<vector<uint8_t> > c_labels;
+    vector<vector<uint64_t> > t_hasChild;
+    vector<vector<uint64_t> > s_node_boundary;
     vector<vector<uint64_t> > val;
+
+    vector<vector<std::bitset<64>>> t_hasChild_bitset;
+    vector<vector<std::bitset<64>>> s_node_boundary_bitset;
+
 
     vector<std::pair<vector<uint64_t>, vector<uint64_t >>> val_succ_tmp(longestKeyLen);
     vector<uint64_t> values_count_per_level(longestKeyLen);
@@ -148,17 +156,17 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
 
     // init
     for (int i = 0; i < longestKeyLen; i++) {
-        c.emplace_back(vector<uint8_t>()); // labels \in {0,1,2,3}
-        t.emplace_back(vector<uint64_t>());
-        s.emplace_back(vector<uint64_t>());
+        c_labels.emplace_back(vector<uint8_t>()); // labels \in {0,1,2,3}
+        t_hasChild.emplace_back(vector<uint64_t>());
+        s_node_boundary.emplace_back(vector<uint64_t>());
         val.emplace_back(vector<uint64_t>());
         keys_per_level.push_back(0);
 
         pos_list.push_back(0);
         nc.push_back(0);
 
-        t[i].push_back(0);
-        s[i].push_back(0);
+        t_hasChild[i].push_back(0);
+        s_node_boundary[i].push_back(0);
     }
 
     int last_value_level = 0;
@@ -180,7 +188,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         uint64_t value = values[value_index];
 
         int i = 0;
-        while (i < levels && !insertChar_cond(get_label((uint8_t) key[i/4], i % 4), c[i], t[i], s[i], pos_list[i], nc[i])) {
+        while (i < levels && !insertChar_cond(get_label((uint8_t) key[i/4], i % 4), c_labels[i], t_hasChild[i], s_node_boundary[i], pos_list[i], nc[i])) {
             i++;
         }
 
@@ -190,24 +198,24 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
             auto cpl = static_cast<uint32_t >(levels); //commonPrefixLen(key, keys[k + 1]);
             if (i < (cpl - 1)) {
                 // There will be a child node -> set T bit of corresponding position within node
-                // todo set t at the correct position for 4 bit nodes
+                // todo set t_hasChild at the correct position for 4 bit nodes
                 if (pos_list[i] % 64 == 0)
-                    setBit(t[i].rbegin()[1], 63);
+                    setBit(t_hasChild[i].rbegin()[1], 63);
                 else
-                    setBit(t[i].back(), (pos_list[i] - 1) % 64);
+                    setBit(t_hasChild[i].back(), (pos_list[i] - 1) % 64);
             }
             // the first (denormalized) key MAY be inserted in insertChar
             //if (i == levels - 1) {
             //    index++;
             //}
-            while (i < (cpl)) {
+            while (i < cpl) {
                 i++;
-                if (i < (cpl))
-                    insertChar(get_label((uint8_t) key[i/4], i % 4), false, c[i], t[i], s[i], pos_list[i], nc[i], true);
+                if (i < cpl)
+                    insertChar(get_label((uint8_t) key[i/4], i % 4), i == cpl - 1, c_labels[i], t_hasChild[i], s_node_boundary[i], pos_list[i], nc[i], true);
             }
             //for (; index < end_index; index++) {
             //    key[number_common_cells] = keys[index];
-            //    insertChar((uint8_t) key[i], true, c[i], t[i], s[i], pos_list[i], nc[i],
+            //    insertChar((uint8_t) key[i], true, c_labels[i], t_hasChild[i], s_node_boundary[i], pos_list[i], nc[i],
             //               end_index - index == number_denorm_cells);
             //}
 
@@ -223,6 +231,20 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
 
     }
 
+#ifdef DEBUG_BITSETS
+    // transfer to readable format
+    for (int i = 0; i < longestKeyLen; i++) {
+        t_hasChild_bitset.emplace_back(std::vector<bitset<64>>());
+        s_node_boundary_bitset.emplace_back(std::vector<bitset<64>>());
+        for (int j = 0; j < t_hasChild[i].size(); j++) {
+            t_hasChild_bitset[i].push_back(std::bitset<64>(t_hasChild[i][j]));
+            cout << "sbits: " << std::bitset<64>(s_node_boundary[i][j]) << std::endl;
+            cout << "tbits: " << std::bitset<64>(t_hasChild[i][j]) << std::endl;
+            s_node_boundary_bitset[i].push_back(std::bitset<64>(s_node_boundary[i][j]));
+
+        }
+    }
+#endif
     // put together
     int nc_total = 0;
     for (int i = 0; i < (int) nc.size(); i++)
@@ -259,13 +281,13 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
         uint8_t ch = 0;
         uint32_t j = 0;
         uint32_t k = 0;
-        for (j = 0; j < (int) s[i].size(); j++) {
+        for (j = 0; j < (int) s_node_boundary[i].size(); j++) {
             if (sbitPos_i >= smaxPos_i) break;
             for (k = 0; k < 64; k++) {
                 if (sbitPos_i >= smaxPos_i) break;
 
-                ch = c[i][sbitPos_i];
-                if (readBit(s[i][j], k)) {
+                ch = c_labels[i][sbitPos_i];
+                if (readBit(s_node_boundary[i][j], k)) {
                     for (int l = 0; l < 4; l++) {
                         cU[i].push_back(0);
                         tU[i].push_back(0);
@@ -277,14 +299,14 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
                     else {
                         oU[i].push_back(0);
                         setLabel((uint64_t *) cU[i].data() + cU[i].size() - 4, ch);
-                        if (readBit(t[i][j], k)) {
+                        if (readBit(t_hasChild[i][j], k)) {
                             setLabel((uint64_t *) tU[i].data() + tU[i].size() - 4, ch);
                             childCountU_++;
                         }
                     }
                 } else {
                     setLabel((uint64_t *) cU[i].data() + cU[i].size() - 4, ch);
-                    if (readBit(t[i][j], k)) {
+                    if (readBit(t_hasChild[i][j], k)) {
                         setLabel((uint64_t *) tU[i].data() + tU[i].size() - 4, ch);
                         childCountU_++;
                     }
@@ -369,10 +391,10 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     val_memU_ = vallenU * 8;
 
     //-------------------------------------------------
-    for (int i = cutoff_level_; i < (int) c.size(); i++)
-        c_mem_ += c[i].size();
+    for (int i = cutoff_level_; i < (int) c_labels.size(); i++)
+        c_mem_ += c_labels[i].size();
 
-    for (int i = cutoff_level_; i < (int) c.size(); i++)
+    for (int i = cutoff_level_; i < (int) c_labels.size(); i++)
         val_mem_ += val[i].size() * sizeof(uint64_t);
 
     if (c_mem_ % 64 == 0) {
@@ -400,22 +422,22 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     //todo: parallelize the following stuff
 
     uint64_t c_pos = 0;
-    for (int i = cutoff_level_; i < (int) c.size(); i++) {
-        for (int j = 0; j < (int) c[i].size(); j++) {
-            cbytes_[c_pos] = c[i][j];
+    for (int i = cutoff_level_; i < (int) c_labels.size(); i++) {
+        for (int j = 0; j < (int) c_labels[i].size(); j++) {
+            cbytes_[c_pos] = c_labels[i][j];
             c_pos++;
         }
     }
 
     uint64_t t_bitPos = 0;
-    for (int i = cutoff_level_; i < (int) t.size(); i++) {
+    for (int i = cutoff_level_; i < (int) t_hasChild.size(); i++) {
         uint64_t bitPos_i = 0;
         uint64_t maxPos_i = pos_list[i];
-        for (int j = 0; j < (int) t[i].size(); j++) {
+        for (int j = 0; j < (int) t_hasChild[i].size(); j++) {
             if (bitPos_i >= maxPos_i) break;
             for (int k = 0; k < 64; k++) {
                 if (bitPos_i >= maxPos_i) break;
-                if (readBit(t[i][j], k))
+                if (readBit(t_hasChild[i][j], k))
                     setBit(tbits[t_bitPos / 64], t_bitPos % 64);
                 t_bitPos++;
                 bitPos_i++;
@@ -427,14 +449,14 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     t_mem_ = tbits_->getMem(); //stat
 
     uint64_t s_bitPos = 0;
-    for (int i = cutoff_level_; i < (int) s.size(); i++) {
+    for (int i = cutoff_level_; i < (int) s_node_boundary.size(); i++) {
         uint64_t bitPos_i = 0;
         uint64_t maxPos_i = pos_list[i];
-        for (int j = 0; j < (int) s[i].size(); j++) {
+        for (int j = 0; j < (int) s_node_boundary[i].size(); j++) {
             if (bitPos_i >= maxPos_i) break;
             for (int k = 0; k < 64; k++) {
                 if (bitPos_i >= maxPos_i) break;
-                if (readBit(s[i][j], k))
+                if (readBit(s_node_boundary[i][j], k))
                     setBit(sbits[s_bitPos / 64], s_bitPos % 64);
                 s_bitPos++;
                 bitPos_i++;
@@ -455,8 +477,8 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     //-------------------------------------------------
     //node counts per level
     nc_ = nc;
-    for (auto i = 0; i < c.size(); i++) {
-        keys_per_level[i] = c[i].size();
+    for (auto i = 0; i < c_labels.size(); i++) {
+        keys_per_level[i] = c_labels[i].size();
     }
     keys_per_level_ = keys_per_level;
 
