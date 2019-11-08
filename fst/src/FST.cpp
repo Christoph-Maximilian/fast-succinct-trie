@@ -730,13 +730,11 @@ uint64_t FST::getFirstNodePositionOnLevel(const uint8_t *key, const int keylen, 
     // SEARCH IN DENSE NODES
     //******************************************************
     while (keypos < keylen && keypos <= level) {
-        kc = (uint8_t) key[keypos];
-        //Todo: Check if parent cell ids are in node - this pos calculation is
-        // important since kc is the key, e.g.'b'
-        pos = (nodeNum << 8) + kc;
+        kc = get_label(key[keypos / 4], keypos % 4);
+        pos = (nodeNum << 2u) + kc;
 
-        __builtin_prefetch(tbitsU_->bits_ + (nodeNum << 2) + (kc >> 6), 0);
-        __builtin_prefetch(tbitsU_->rankLUT_ + ((pos + 1) >> 6), 0);
+        __builtin_prefetch(tbitsU_->bits_ + (nodeNum / 16), 0);
+        __builtin_prefetch(tbitsU_->rankLUT_ + ((pos + 1) >> 6u), 0);
 
         nodeNum = childNodeNumU(pos);
         keypos++;
