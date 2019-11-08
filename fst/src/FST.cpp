@@ -5,7 +5,7 @@
 #include <cmath>
 #include <bitset>
 
-#define DEBUG_BITSETS
+//#define DEBUG_BITSETS
 
 FST::FST(int cutoff_level) : cutoff_level_(cutoff_level), nodeCountU_(0), childCountU_(0),
                              cbitsU_(nullptr), tbitsU_(nullptr), obitsU_(nullptr), valuesU_(nullptr),
@@ -808,7 +808,8 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value, uint64_t
         nodeNum = childNodeNumU(pos);
         keypos++;
     }
-
+    // Todo also support sparse levels?
+    return false;
     //******************************************************
     // SEARCH IN SPARSE NODES
     // ******************************************************
