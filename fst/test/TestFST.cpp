@@ -24,6 +24,7 @@ const string testFilePath = "test/bulkload_sort";
 const string testFileExamplePath = "test/bulkload_example";
 const string testPolygonIdsPath = "test/polygon_ids_simplified";
 const string testPointsIdsPath = "test/simple_point_test";
+const string testSimplifiedPointsIdsPath = "test/point_ids_simplified";
 
 class UnitTest : public ::testing::Test {
 public:
@@ -84,7 +85,7 @@ std::vector<uint8_t> cell_id_to_array(const S2CellId cell_id, bool polygon = fal
     id = (id >> shift) << shift;
     std::bitset<64> cell_bits_without_face_trailing(id);
     key[0] = level;
-    reinterpret_cast<uint64_t *>(key.data()+1)[0] = __builtin_bswap64(id);
+    reinterpret_cast<uint64_t *>(key.data() + 1)[0] = __builtin_bswap64(id);
 
 
 #ifdef PRINT_KEY_STRING
@@ -93,7 +94,7 @@ std::vector<uint8_t> cell_id_to_array(const S2CellId cell_id, bool polygon = fal
     std::cout << cell_bits_without_face_trailing << std::endl;
 
     std::cout << "Cell ID: " << cell_id.id() << "\nKEY: ";
-    for (auto i = 0; i < used_bytes+1; i++) {
+    for (auto i = 0; i < used_bytes + 1; i++) {
         std::cout << +key[i] << ":";
     }
     std::cout << std::endl;
@@ -133,12 +134,24 @@ TEST_F(UnitTest, ScanTest) {
     vector<uint64_t> values;
     int longestKeyLen = loadPolygonIdsFile(keys, values, testPolygonIdsPath);
 
+    vector<uint8_t> point_keys;
+    vector<uint64_t> point_values;
+    loadPolygonIdsFile(point_keys, point_values, testSimplifiedPointsIdsPath);
+
     FST *index = new FST(10);
     index->load(keys, values, longestKeyLen);
 
-    printStatFST(index);
+    uint64_t expected_value = 0;
+    for (int i = 0; i < point_keys.size();) {
+        uint64_t value;
+        int keylen = point_keys[i];
+        index->lookup(point_keys.data() + i + 1, keylen, value);
+        assert(value == expected_value);
+        expected_value++;
+        i += (keylen * 2 + 7) / 8 + 1;
+    }
 
-    FSTIter iter(index);
+    printStatFST(index);
 }
 
 

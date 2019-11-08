@@ -225,7 +225,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
             //}
 
             // todo: save values more efficiently here
-            val[i-1].push_back(value);
+            val[i - 1].push_back(value);
 
 
         } else
@@ -395,6 +395,7 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
     val_memU_ = vallenU * 8;
 
     //-------------------------------------------------
+    // build lower levels
     for (int i = cutoff_level_; i < (int) c_labels.size(); i++)
         c_mem_ += c_labels[i].size();
 
@@ -502,14 +503,14 @@ void FST::load(vector<uint64_t> &keys, vector<uint64_t> &values) {
 // IS C BIT SET U(pper Level)? -> dense
 //******************************************************
 inline bool FST::isCbitSetU(uint64_t nodeNum, uint8_t kc) {
-    return isLabelExist(cbitsU_->bits_ + (nodeNum << 2), kc);
+    return isLabelExist(cbitsU_->bits_ + (nodeNum / 16), (nodeNum % 16) * 4 + kc);
 }
 
 //******************************************************
 // IS T BIT SET U? dense
 //******************************************************
 inline bool FST::isTbitSetU(uint64_t nodeNum, uint8_t kc) {
-    return isLabelExist(tbitsU_->bits_ + (nodeNum << 2), kc);
+    return isLabelExist(tbitsU_->bits_ + (nodeNum / 16), (nodeNum % 16) * 4 + kc);
 }
 
 //******************************************************
@@ -538,7 +539,7 @@ inline bool FST::isTbitSet(uint64_t pos) {
 //******************************************************
 inline uint64_t FST::valuePosU(uint64_t nodeNum, uint64_t pos) {
     //todo: last obits can be optimized out ???
-    return cbitsU_->rank(pos + 1) - tbitsU_->rank(pos + 1) + obitsU_->rank(nodeNum + 1) - 1;
+    return cbitsU_->rank(pos + 1) - tbitsU_->rank(pos + 1) - 1;
 }
 
 //******************************************************
@@ -778,19 +779,20 @@ void FST::getNode(uint64_t nodeNum, vector<uint8_t> &labels, vector<bool> &hasCh
 
 bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value, uint64_t nodeNum) {
     int keypos = 0;
-    uint8_t kc = (uint8_t) key[keypos];
+    auto kc = (uint8_t) key[keypos];
     uint64_t pos = kc;
 
     //******************************************************
     // SEARCH IN DENSE NODES
     // ******************************************************
     while (keypos < keylen && keypos < cutoff_level_) {
-        kc = (uint8_t) key[keypos];
-        pos = (nodeNum << 8) + kc;
+        kc = get_label(key[keypos/4], keypos % 4);
+        pos = (nodeNum << 2u) + kc;
 
-        __builtin_prefetch(tbitsU_->bits_ + (nodeNum << 2) + (kc >> 6), 0);
-        __builtin_prefetch(tbitsU_->rankLUT_ + ((pos + 1) >> 6), 0);
+        __builtin_prefetch(tbitsU_->bits_ + (nodeNum / 16), 0);
+        __builtin_prefetch(tbitsU_->rankLUT_ + ((pos + 1) >> 6u), 0);
 
+        // todo calculate beforehand the correct positions for isT and C bit set
         if (!isCbitSetU(nodeNum, kc)) { // is C-label set?
             return false;
         }
