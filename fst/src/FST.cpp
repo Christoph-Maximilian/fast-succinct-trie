@@ -750,9 +750,9 @@ void FST::getNode(uint64_t nodeNum, vector<uint8_t> &labels, vector<bool> &hasCh
                   vector<uint64_t> &nodeNumbersAndValues) {
     uint64_t pos;
     // iterate through DENSE node and collect relevant information
-    for (uint16_t i = 0; i <= 255; i++) {
+    for (uint16_t i = 0; i <= 4; i++) {
         uint8_t kc = i;
-        pos = (nodeNum << 8) + kc;
+        pos = (nodeNum << 2u) + kc;
         if (isCbitSetU(nodeNum, kc)) { // is C-label set?
             labels.push_back(kc);
             if (isTbitSetU(nodeNum, kc)) {
