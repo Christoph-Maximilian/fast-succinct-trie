@@ -305,15 +305,17 @@ void FST::load(vector<uint8_t> &keys, vector<uint64_t> &values, int longestKeyLe
                     number_nodes_level[i]++;
                     nodeCountU_++;
 
-                    setLabel((uint64_t *) cU[i].data() + cU[i].size() - 1, ch + 4 * (number_nodes_level[i] - 1));
+                    setLabel((uint64_t *) cU[i].data() + cU[i].size() - 1, ch + 4 * ((number_nodes_level[i] - 1) % 16));
                     if (readBit(t_hasChild[i][j], k)) {
-                        setLabel((uint64_t *) tU[i].data() + tU[i].size() - 1, ch + 4 * (number_nodes_level[i] - 1));
+                        setLabel((uint64_t *) tU[i].data() + tU[i].size() - 1,
+                                 ch + 4 * ((number_nodes_level[i] - 1) % 16));
                         childCountU_++;
                     }
                 } else {
-                    setLabel((uint64_t *) cU[i].data() + cU[i].size() - 1, ch + 4 * (number_nodes_level[i] - 1));
+                    setLabel((uint64_t *) cU[i].data() + cU[i].size() - 1, ch + 4 * ((number_nodes_level[i] - 1) % 16));
                     if (readBit(t_hasChild[i][j], k)) {
-                        setLabel((uint64_t *) tU[i].data() + tU[i].size() - 1, ch + 4 * (number_nodes_level[i] - 1));
+                        setLabel((uint64_t *) tU[i].data() + tU[i].size() - 1,
+                                 ch + 4 * ((number_nodes_level[i] - 1) % 16));
                         childCountU_++;
                     }
                 }
@@ -786,7 +788,7 @@ bool FST::lookup(const uint8_t *key, const int keylen, uint64_t &value, uint64_t
     // SEARCH IN DENSE NODES
     // ******************************************************
     while (keypos < keylen && keypos < cutoff_level_) {
-        kc = get_label(key[keypos/4], keypos % 4);
+        kc = get_label(key[keypos / 4], keypos % 4);
         pos = (nodeNum << 2u) + kc;
 
         __builtin_prefetch(tbitsU_->bits_ + (nodeNum / 16), 0);

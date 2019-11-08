@@ -15,7 +15,7 @@
 #define PRINT_KEY_STRING
 #define TEST_SIZE 234369
 #define RANGE_SIZE 10
-#define CELLS 128
+#define CELLS 5200
 //#define PRINT_KEY_STRING
 
 using namespace std;
@@ -25,6 +25,7 @@ const string testFileExamplePath = "test/bulkload_example";
 const string testPolygonIdsPath = "test/polygon_ids_simplified";
 const string testPointsIdsPath = "test/simple_point_test";
 const string testSimplifiedPointsIdsPath = "test/point_ids_simplified";
+const string testNeighborhoods = "test/s2cellids";
 
 class UnitTest : public ::testing::Test {
 public:
@@ -82,7 +83,9 @@ std::vector<uint8_t> cell_id_to_array(const S2CellId cell_id, bool polygon = fal
     std::vector<uint8_t> key(used_bytes + 1);
     uint8_t shift = 64 - level * 2;
     // clear the last set bit
-    id = (id >> shift) << shift;
+    if (polygon) {
+        id = (id >> shift) << shift;
+    }
     std::bitset<64> cell_bits_without_face_trailing(id);
     key[0] = level;
     reinterpret_cast<uint64_t *>(key.data() + 1)[0] = __builtin_bswap64(id);
@@ -115,7 +118,7 @@ int loadPolygonIdsFile(vector<uint8_t> &keys, vector<uint64_t> &values, const st
         if (cell_id == tmp) { break; }
         std::bitset<64> baz(cell_id);
         S2CellId cell(baz.to_ulong());
-        auto key_vector = cell_id_to_array(cell);
+        auto key_vector = cell_id_to_array(cell, false);
         std::copy(key_vector.begin(), key_vector.end(), std::back_inserter(keys));
         values.push_back(count);
         if (key_vector[0] > longestKeyLen) { longestKeyLen = key_vector[0]; }
@@ -124,12 +127,40 @@ int loadPolygonIdsFile(vector<uint8_t> &keys, vector<uint64_t> &values, const st
     return longestKeyLen;
 }
 
+int loadPolygonIdsFileExtendec(vector<uint8_t> &keys, vector<uint8_t> &point_keys, vector<uint64_t> &values,
+                               const std::string &file) {
+    ifstream infile(file);
+    std::string op;
+    std::string cell_id;
+    uint64_t count = 0;
+    int longestKeyLen = 0;
+    while (count < CELLS && infile.good()) {
+        std::string tmp = cell_id;
+        infile >> cell_id; //subject to change
+        if (cell_id == tmp) { break; }
+        uint64_t  cell_uint64 = std::stoull(cell_id);
+        S2CellId cell(cell_uint64);
+        S2CellId point(cell_uint64 + 1);
+        assert(cell.contains(point));
+
+        auto key_vector = cell_id_to_array(cell);
+        auto point_key_vector = cell_id_to_array(point);
+        std::copy(key_vector.begin(), key_vector.end(), std::back_inserter(keys));
+        std::copy(point_key_vector.begin(), point_key_vector.end(), std::back_inserter(point_keys));
+        values.push_back(count);
+        if (key_vector[0] > longestKeyLen) { longestKeyLen = key_vector[0]; }
+        count++;
+    }
+    return longestKeyLen;
+}
+
+
 
 //*****************************************************************
 // FST TESTS
 //*****************************************************************
 
-TEST_F(UnitTest, ScanTest) {
+TEST_F(UnitTest, SimplePolygonTest) {
     vector<uint8_t> keys;
     vector<uint64_t> values;
     int longestKeyLen = loadPolygonIdsFile(keys, values, testPolygonIdsPath);
@@ -153,6 +184,29 @@ TEST_F(UnitTest, ScanTest) {
 
     printStatFST(index);
 }
+
+TEST_F(UnitTest, NeighborhoodsPolygonTest) {
+    vector<uint8_t> keys;
+    vector<uint8_t> point_keys;
+    vector<uint64_t> values;
+    int longestKeyLen = loadPolygonIdsFileExtendec(keys, point_keys, values, testNeighborhoods);
+
+    FST *index = new FST(10);
+    index->load(keys, values, longestKeyLen);
+
+    uint64_t expected_value = 0;
+    for (int i = 0; i < point_keys.size();) {
+        uint64_t value;
+        int keylen = point_keys[i];
+        index->lookup(point_keys.data() + i + 1, keylen, value);
+       // assert(value == expected_value);
+        expected_value++;
+        i += (keylen * 2 + 7) / 8 + 1;
+    }
+
+    printStatFST(index);
+}
+
 
 
 int main(int argc, char **argv) {

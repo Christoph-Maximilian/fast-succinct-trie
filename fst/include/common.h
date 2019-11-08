@@ -2,7 +2,7 @@
 #define _COMMON_H_
 
 #include <stdint.h>
-
+#include <cassert>
 #define MSB_MASK 0x8000000000000000
 
 #define likely(x) __builtin_expect(!!(x), 1)
@@ -48,6 +48,7 @@ inline bool isLabelExist_lowerBound(uint64_t *bits, uint8_t c, uint8_t &pos) {
 }
 
 inline void setLabel(uint64_t *bits, uint8_t c) {
+    assert(c < 64);
     int group = c >> 6;
     int idx = c & 63;
     bits[group] |= ((uint64_t)1 << (63 - idx));
